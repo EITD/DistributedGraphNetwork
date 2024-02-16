@@ -31,16 +31,16 @@ node_edges = {}
 
 with open(filename, "r") as file:
     for line in file:
-        # Remove spaces and split the line into two integers
-        nodes = map(int, line.strip().split())
+      # Remove spaces and split the line into two integers
+      nodes = map(int, line.strip().split())
 
-        # Or access individual numbers:
-        src, dst = nodes
+      # Or access individual numbers:
+      src, dst = nodes
 
-        # Further process numbers1 and number2 as needed
-        if src not in node_edges:
-        	node_edges[src] = set()
-        node_edges[src].add(dst)
+      # Further process numbers1 and number2 as needed
+      if src not in node_edges:
+        node_edges[src] = set()
+      node_edges[src].add(dst)
 
 partitions = hash_partitioning(node_edges, NUM_PARTITIONS)
 

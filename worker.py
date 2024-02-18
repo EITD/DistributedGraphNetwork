@@ -34,13 +34,14 @@ def start_worker(worker_id, port):
     worker(worker_id, port, load_node_data(worker_id))
 
 if __name__ == "__main__":
-    workers = [Process(target=start_worker, args=(i, 10000+i)) for i in PARTITION_LIST]
-    graphList = []
+    workersDict = {}
+    graphDict = {}
 
     for i in PARTITION_LIST:
+        w = Process(target=start_worker, args=(i, 10000+i))
         g = ConvertFile.toGraph(f"./data/partition_{i}.txt", " ")
-        graphList.append(g)
-    for w in workers:
+        workersDict[i] = w
+        graphDict[i] = g
         w.start()
     # for w in workers:
     #     w.join()

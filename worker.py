@@ -1,7 +1,10 @@
 import socket
 from multiprocessing import Process
+import ConvertFile
 
-NUM_PARTITIONS = 4
+NUM_PARTITIONS_START = 0
+NUM_PARTITIONS_END = 4
+PARTITION_LIST = [i for i in range(NUM_PARTITIONS_START, NUM_PARTITIONS_END)]
 NODE_FEATURES = "./data/node_features.txt"
 
 def load_node_data(worker_id):
@@ -30,7 +33,7 @@ def start_worker(worker_id, port):
     worker(worker_id, port, load_node_data(worker_id))
 
 if __name__ == "__main__":
-    workers = [Process(target=start_worker, args=(i, 10000+i)) for i in range(NUM_PARTITIONS)]
+    workers = [Process(target=start_worker, args=(i, 10000+i)) for i in PARTITION_LIST]
     for w in workers:
         w.start()
     for w in workers:

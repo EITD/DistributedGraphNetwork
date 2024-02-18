@@ -18,4 +18,4 @@ class ConvertFile:
                 Returns:
                 - graph (networkx.Graph): The NetworkX graph converted from the file.
                 """
-                return nx.read_weighted_edgelist(filePath, delimiter = d) if weight else nx.read_edgelist(filePath, delimiter = d)
+                return nx.read_weighted_edgelist(filePath, delimiter = d) if weight else nx.read_edgelist(filePath, create_using=nx.DiGraph(), delimiter = d)

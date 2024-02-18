@@ -1,6 +1,7 @@
 import socket
 from multiprocessing import Process
-import ConvertFile
+from ConvertFile import ConvertFile, nx
+from matplotlib import pyplot as plt
 
 NUM_PARTITIONS_START = 0
 NUM_PARTITIONS_END = 4
@@ -34,7 +35,12 @@ def start_worker(worker_id, port):
 
 if __name__ == "__main__":
     workers = [Process(target=start_worker, args=(i, 10000+i)) for i in PARTITION_LIST]
+    graphList = []
+
+    for i in PARTITION_LIST:
+        g = ConvertFile.toGraph(f"./data/partition_{i}.txt", " ")
+        graphList.append(g)
     for w in workers:
         w.start()
-    for w in workers:
-        w.join()
+    # for w in workers:
+    #     w.join()

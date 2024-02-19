@@ -12,12 +12,13 @@ class MySocket:
     ask_reply_dict = dict()
     serverDict = {}
     
-    def __init__(self, myNode, port, NUM_PARTITIONS = NUM_PARTITIONS):
+    def __init__(self, myNode, port, NUM_PARTITIONS = NUM_PARTITIONS, client = False):
         host = socket.gethostbyname(socket.gethostname())
         print('host:', host)
         print('port:', port)
         
-        self.serverDict[myNode] = (host, port)
+        if not client:
+            self.serverDict[myNode] = (host, port)
         
         while len(self.serverDict) < NUM_PARTITIONS:
             print("# have", len(self.serverDict), "Server")

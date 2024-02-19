@@ -9,3 +9,5 @@ input("run?")
 
 for i in range(10):
         s.ask(i, node=i%NUM_PARTITIONS, msg=str((i, i)))
+
+exit(0)

@@ -24,7 +24,7 @@ class MySocket:
             n = input("Enter other server partation:")
             ip = input("Enter other server ip address:")
             p = input("Enter other server port:")
-            self.serverDict[n] = (ip, p)
+            self.serverDict[int(n)] = (ip, int(p))
         
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)
@@ -74,15 +74,21 @@ class MySocket:
         ask_thread.start()
 
     def _ask(self, mid, node, msg):
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect(self.serverDict.get(node % NUM_PARTITIONS))
-        client_socket.send(msg.encode())
-        
-        data = client_socket.recv(1024).decode()
-        print('get reply:', data)
-        self.ask_reply_dict[mid] = data
+        while True:
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                client_socket.connect(self.serverDict.get(node % NUM_PARTITIONS))
+                client_socket.send(msg.encode())
+                
+                data = client_socket.recv(1024).decode()
+                print('get reply:', data)
+                self.ask_reply_dict[mid] = data
 
-        client_socket.close()
+                client_socket.close()
+                break
+            except (ConnectionRefusedError):
+                client_socket.close()
+                continue
 
 # d = {0:("130.229.156.171",12346), 2:("130.229.156.171",12347), 3:("130.229.156.171",12348)}
 

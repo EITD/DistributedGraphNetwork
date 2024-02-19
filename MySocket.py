@@ -19,14 +19,19 @@ class MySocket:
         
         if not client:
             self.serverDict[myNode] = (host, port)
-        
-        while len(self.serverDict) < NUM_PARTITIONS:
-            print("# have", len(self.serverDict), "Server")
+            print("# add any Server")
             n = input("Enter other server partation:")
             ip = input("Enter other server ip address:")
             p = input("Enter other server port:")
             self.serverDict[int(n)] = (ip, int(p))
         
+        while len(self.serverDict) < NUM_PARTITIONS and not client:
+            print("# have", len(self.serverDict), "Server")
+            n = input("Enter other server partation:")
+            ip = input("Enter other server ip address:")
+            p = input("Enter other server port:")
+            self.serverDict[int(n)] = (ip, int(p))
+
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)
         

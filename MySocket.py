@@ -13,15 +13,21 @@ class MySocket:
     ask_reply_dict = dict()
     serverDict = {}
     NUM_PARTITIONS = None
+    client = False
     
     def __init__(self, myNode, port, NUM_PARTITIONS = 4, client = False):
         host = socket.gethostbyname(socket.gethostname())
         print('host:', host)
         print('port:', port)
         self.NUM_PARTITIONS = NUM_PARTITIONS
+        self.client = client
         
         testIp = '130.229.150.211'
-        self.serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
+        if not client:
+            self.serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
+            
+        if client:
+            self.serverDict = {-1:(testIp,12345)}
         
         # if not client:
         #     self.serverDict[myNode] = (host, port)
@@ -91,7 +97,10 @@ class MySocket:
         while True:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                client_socket.connect(self.serverDict.get(node % self.NUM_PARTITIONS))
+                if self.client:
+                    client_socket.connect(self.serverDict[-1][1])
+                else:
+                    client_socket.connect(self.serverDict.get(node % self.NUM_PARTITIONS))
                 client_socket.send(msg.encode())
                 
                 data = client_socket.recv(1024).decode()

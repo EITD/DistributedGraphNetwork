@@ -12,7 +12,7 @@ class MySocket:
     ask_reply_dict = dict()
     serverDict = {}
     
-    def __init__(self, myNode, port):
+    def __init__(self, myNode, port, NUM_PARTITIONS = NUM_PARTITIONS):
         host = socket.gethostbyname(socket.gethostname())
         print('host:', host)
         print('port:', port)

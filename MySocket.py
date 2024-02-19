@@ -12,11 +12,12 @@ class MySocket:
     ask_reply_dict = dict()
     serverDict = {}
     
-    def __init__(self, port, serverDict):
+    def __init__(self, myNode, port, serverDict):
         host = socket.gethostbyname(socket.gethostname())
-        print('host:', socket.gethostbyname(socket.gethostname()))
+        print('host:', host)
         print('port:', port)
         self.serverDict = serverDict
+        self.serverDict[myNode] = (host, port)
         
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)
@@ -34,24 +35,32 @@ class MySocket:
         while True:
             client_socket, _ = self.server_socket.accept()
             
-            data = client_socket.recv(1024)
-            
-            self.message_get_queue.put((client_socket, data.decode()))
-            
+            client_thread = threading.Thread(target=self.handle_client_connection, args=(client_socket,))
+            client_thread.start()
+
+    def handle_client_connection(self, client_socket):
+        data = client_socket.recv(1024)
+        self.message_get_queue.put((client_socket, data.decode()))
+
     def send_back(self):
         while True:
             if not self.message_send_queue.empty():
                 client_socket, message = self.message_send_queue.get()
-                client_socket.send(message.encode())
+                
+                send_thread = threading.Thread(target=self._send_message, args=(client_socket, message))
+                send_thread.start()
+
+    def _send_message(self, client_socket, message):
+        client_socket.send(message.encode())
 
     def print_message(self):
         while True:
             if not self.message_get_queue.empty():
                 client_socket, message = self.message_get_queue.get()
-                print('from client socket:', client_socket)
+                # print('from client socket:', client_socket)
                 print('    get msg:', message)
                 
-                self.message_send_queue.put((client_socket, "get msg, send back res"))
+                self.message_send_queue.put((client_socket, "get msg, send back res" + message))
     
     def ask(self, mid, node, msg):
         ask_thread = threading.Thread(target=self._ask, args=(mid, node, msg))
@@ -63,14 +72,17 @@ class MySocket:
         client_socket.send(msg.encode())
         
         data = client_socket.recv(1024).decode()
-        print('get reply', data)
+        print('get reply:', data)
         self.ask_reply_dict[mid] = data
 
         client_socket.close()
 
-# d = {1:("130.229.156.171",12345), 0:("130.229.156.171",12346), 2:("130.229.156.171",12347), 3:("130.229.156.171",12348)}
+# d = {0:("130.229.156.171",12346), 2:("130.229.156.171",12347), 3:("130.229.156.171",12348)}
 
-# s = MySocket(port=12345, serverDict=d)
+# s = MySocket(myNode=1, port=12345, serverDict=d)
+
+# for i in range(10):
+#     s.ask(i, node=i%NUM_PARTITIONS, msg="your_message")
 
 # client_socket, message = s.message_get_queue.get()
 

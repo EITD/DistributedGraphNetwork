@@ -2,17 +2,21 @@ import socket
 import threading
 import queue
 
-class SocketServer:
+NUM_PARTITIONS = 4
+
+class MySocket:
     
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     message_get_queue = queue.Queue()
     message_send_queue = queue.Queue()
+    ask_reply_dict = dict()
+    serverDict = {}
     
-    def __init__(self):
+    def __init__(self, port, serverDict):
         host = socket.gethostbyname(socket.gethostname())
         print('host:', socket.gethostbyname(socket.gethostname()))
-        port = 12345
         print('port:', port)
+        self.serverDict = serverDict
         
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)
@@ -48,8 +52,25 @@ class SocketServer:
                 print('    get msg:', message)
                 
                 self.message_send_queue.put((client_socket, "get msg, send back res"))
+    
+    def ask(self, mid, node, msg):
+        ask_thread = threading.Thread(target=self._ask, args=(mid, node, msg))
+        ask_thread.start()
 
-# s = SocketServer()
+    def _ask(self, mid, node, msg):
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect(self.serverDict.get(node % NUM_PARTITIONS))
+        client_socket.send(msg.encode())
+        
+        data = client_socket.recv(1024).decode()
+        print('get reply', data)
+        self.ask_reply_dict[mid] = data
+
+        client_socket.close()
+
+d = {1:("130.229.156.171",12345), 0:("130.229.156.171",12346), 2:("130.229.156.171",12347), 3:("130.229.156.171",12348)}
+
+s = MySocket(port=12345, serverDict=d)
 
 # client_socket, message = s.message_get_queue.get()
 

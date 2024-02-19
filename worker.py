@@ -59,7 +59,12 @@ class Worker:
         
         for i in range(len(newDeltas)):
             s = sum(newDeltasList[j][i] for j in range(len(newDeltasList)))
-            if s < deltas[i+1]:
+            
+            if s == deltas[i + 1]:
+                continue
+            
+            remaining = deltas[i + 1] - s
+            for _ in range(remaining):
                 idx = random.randint(0, len(newDeltasList) - 1)
                 newDeltasList[idx][i] += 1
         

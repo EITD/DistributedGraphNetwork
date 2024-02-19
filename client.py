@@ -16,6 +16,7 @@ query_node_feature()
 def query_khop_neighborhood(nid, k, deltas):
     request_data = {
         'khop_neighborhood': {
+            'nid': nid,
             'k': k,
             'deltas': deltas
         }

@@ -34,7 +34,7 @@ class MySocket:
         
         # if client:
         #     print("# add any Server")
-        #     n = input("Enter other server partation:")
+        #     n = -1
         #     ip = input("Enter other server ip address:")
         #     p = input("Enter other server port:")
         #     self.serverDict[int(n)] = (ip, int(p))

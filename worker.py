@@ -17,7 +17,7 @@ class Worker:
     graph = {}
 
     def __init__(self, wid, p):
-        self.worker_id = wid
+        self.worker_id = int(wid)
         self.s = MySocket(myNode=wid, port=p, NUM_PARTITIONS=4)
 
     def load_node_data(self):
@@ -35,13 +35,10 @@ class Worker:
         client_socket, message = self.s.message_get_queue.get()
         request_data = json.loads(message)
         if 'node_feature' in request_data:
-            print("here1")
             nid = request_data['node_feature']
             if nid in self.node_data:
-                print("here2")
                 self.s.message_send_queue.put((client_socket, self.node_data[nid]))
             else:
-                print("here3")
                 self.s.ask(0, node=int(nid), msg=message)
 
     

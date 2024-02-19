@@ -22,12 +22,12 @@ class MySocket:
         self.NUM_PARTITIONS = NUM_PARTITIONS
         self.client = client
         
-        testIp = '130.229.150.211'
+        testIp = '130.229.174.26'
         if not client:
-            self.serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
+            self.serverDict = {0:('130.229.150.211',12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
             
         if client:
-            self.serverDict = {-1:(testIp,12345)}
+            self.serverDict = {-1:('130.229.150.211',12345)}
         
         # if not client:
         #     self.serverDict[myNode] = (host, port)
@@ -52,8 +52,8 @@ class MySocket:
         send_thread = threading.Thread(target=self.send_back)
         send_thread.start()
         
-        msg_thread = threading.Thread(target=self.print_message)
-        msg_thread.start()
+        # msg_thread = threading.Thread(target=self.print_message)
+        # msg_thread.start()
         
         server_thread = threading.Thread(target=self.handle_client)
         server_thread.start()
@@ -80,14 +80,14 @@ class MySocket:
     def _send_message(self, client_socket, message):
         client_socket.send(message.encode())
 
-    def print_message(self):
-        while True:
-            if not self.message_get_queue.empty():
-                client_socket, message = self.message_get_queue.get()
-                # print('from client socket:', client_socket)
-                print('    get msg:', message)
+    # def print_message(self):
+    #     while True:
+    #         if not self.message_get_queue.empty():
+    #             client_socket, message = self.message_get_queue.get()
+    #             # print('from client socket:', client_socket)
+    #             print('    get msg:', message)
                 
-                self.message_send_queue.put((client_socket, "get msg, send back res" + message))
+    #             self.message_send_queue.put((client_socket, "get msg, send back res" + message))
     
     def ask(self, mid, node, msg):
         ask_thread = threading.Thread(target=self._ask, args=(mid, node, msg))

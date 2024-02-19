@@ -3,6 +3,7 @@ import threading
 import queue
 
 NUM_PARTITIONS = 4
+d = {0:("localhost",12346), 1:("localhost",12346), 2:("localhost",12347), 3:("localhost",12348)}
 
 class MySocket:
     
@@ -17,22 +18,24 @@ class MySocket:
         print('host:', host)
         print('port:', port)
         
-        if not client:
-            self.serverDict[myNode] = (host, port)
+        self.serverDict = {0:("localhost",12346), 1:("localhost",12346), 2:("localhost",12347), 3:("localhost",12348)}
         
-        if client:
-            print("# add any Server")
-            n = input("Enter other server partation:")
-            ip = input("Enter other server ip address:")
-            p = input("Enter other server port:")
-            self.serverDict[int(n)] = (ip, int(p))
+        # if not client:
+        #     self.serverDict[myNode] = (host, port)
         
-        while len(self.serverDict) < NUM_PARTITIONS and not client:
-            print("# have", len(self.serverDict), "Server")
-            n = input("Enter other server partation:")
-            ip = input("Enter other server ip address:")
-            p = input("Enter other server port:")
-            self.serverDict[int(n)] = (ip, int(p))
+        # if client:
+        #     print("# add any Server")
+        #     n = input("Enter other server partation:")
+        #     ip = input("Enter other server ip address:")
+        #     p = input("Enter other server port:")
+        #     self.serverDict[int(n)] = (ip, int(p))
+        
+        # while len(self.serverDict) < NUM_PARTITIONS and not client:
+        #     print("# have", len(self.serverDict), "Server")
+        #     n = input("Enter other server partation:")
+        #     ip = input("Enter other server ip address:")
+        #     p = input("Enter other server port:")
+        #     self.serverDict[int(n)] = (ip, int(p))
 
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)
@@ -97,8 +100,6 @@ class MySocket:
             except (ConnectionRefusedError):
                 client_socket.close()
                 continue
-
-# d = {0:("130.229.156.171",12346), 2:("130.229.156.171",12347), 3:("130.229.156.171",12348)}
 
 # s = MySocket(myNode=1, port=12345, serverDict=d)
 

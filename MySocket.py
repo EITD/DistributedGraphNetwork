@@ -20,7 +20,7 @@ class MySocket:
         self.serverDict[myNode] = (host, port)
         
         while len(self.serverDict) < NUM_PARTITIONS:
-            print("# have " + len(self.serverDict) + " Server")
+            print("# have", len(self.serverDict), "Server")
             n = input("Enter other server partation:")
             ip = input("Enter other server ip address:")
             p = input("Enter other server port:")

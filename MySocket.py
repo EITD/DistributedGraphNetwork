@@ -12,12 +12,19 @@ class MySocket:
     ask_reply_dict = dict()
     serverDict = {}
     
-    def __init__(self, myNode, port, serverDict):
+    def __init__(self, myNode, port):
         host = socket.gethostbyname(socket.gethostname())
         print('host:', host)
         print('port:', port)
-        self.serverDict = serverDict
+        
         self.serverDict[myNode] = (host, port)
+        
+        while len(self.serverDict) < NUM_PARTITIONS:
+            print("# have " + len(self.serverDict) + " Server")
+            n = input("Enter other server partation:")
+            ip = input("Enter other server ip address:")
+            p = input("Enter other server port:")
+            self.serverDict[n] = (ip, p)
         
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)

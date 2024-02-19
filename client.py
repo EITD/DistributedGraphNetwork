@@ -12,21 +12,18 @@ def query_node_feature():
 
 query_node_feature()
 
-# def query_node_feature(port, nid, k, deltas):
-#     request_data = {
-#         'nid': nid,
-#         'k': k,
-#         'deltas': deltas
-#     }
 
-#     request_json = json.dumps(request_data)
+def query_khop_neighborhood(nid, k, deltas):
+    request_data = {
+        'khop_neighborhood': {
+            'k': k,
+            'deltas': deltas
+        }
+    }
 
-#     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-#         s.connect(('localhost', port))
-#         s.sendall(request_json.encode())
-#         response = s.recv(1024)
-#         print(f"Response: {response.decode()}")
+    request_json = json.dumps(request_data)
 
-# # Example query
-# # This should match the port of the worker responsible for the node being queried
-# query_node_feature(10000, '0', 2, [2, 2])  # Querying worker 0 for node 1's feature
+    s = MySocket(myNode=None, port=10000, NUM_PARTITIONS=4, client=True)
+    s.ask(0, node=nid, msg=request_json)
+
+query_khop_neighborhood('0', 2, [2, 2])  

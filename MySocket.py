@@ -98,7 +98,7 @@ class MySocket:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 if self.client:
-                    client_socket.connect(self.serverDict[-1][1])
+                    client_socket.connect(self.serverDict[-1])
                 else:
                     client_socket.connect(self.serverDict.get(node % self.NUM_PARTITIONS))
                 client_socket.send(msg.encode())

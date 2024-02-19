@@ -1,15 +1,19 @@
-from asyncio import sleep
-from MySocket import MySocket
 
-NUM_PARTITIONS = 2
+import random
 
-s = MySocket(myNode=0, port=12346, NUM_PARTITIONS=2)
 
-print(s.serverDict)
+k = 3
+deltas = [2,3,5]
 
-input("run?")
+kNew = k - 1
+newDeltas = [i // deltas[0] for i in deltas[1:]]
+newDeltasList = [newDeltas.copy() for _ in range(deltas[0])]
 
-for i in range(10):
-        s.ask(i, node=i, msg=str((i, i)))
+for i in range(len(newDeltas)):
+    s = sum(newDeltasList[j][i] for j in range(len(newDeltasList)))
+    if s < deltas[i+1]:
+        idx = random.randint(0, len(newDeltasList) - 1)
+        newDeltasList[idx][i] += 1
 
-exit(0)
+print(newDeltasList)
+

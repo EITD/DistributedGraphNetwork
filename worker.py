@@ -1,3 +1,4 @@
+import random
 import socket
 from multiprocessing import Process
 from ConvertFile import ConvertFile, nx
@@ -15,6 +16,7 @@ class Worker:
     s = None
     node_data = {}
     graph = {}
+    acc = 0
 
     def __init__(self, wid, p):
         self.worker_id = int(wid)
@@ -34,38 +36,58 @@ class Worker:
     def start_listen(self):
         client_socket, message = self.s.message_get_queue.get()
         request_data = json.loads(message)
-        if 'node_feature' in request_data:
-            nid = request_data['node_feature']
-            if nid in self.node_data:
+        if nid in self.node_data:
+            if 'node_feature' in request_data:
+                nid = request_data['node_feature']
                 self.s.message_send_queue.put((client_socket, self.node_data[nid]))
-            else:
-                self.s.ask(0, node=int(nid), msg=message)
+            elif 'khop_neighborhood' in request_data:
+                nid = request_data['nid']
+                k = request_data['k']
+                deltas = request_data['deltas']
+                sums = self.khop_neighborhood(nid, k, deltas)
+                self.s.message_send_queue.put((client_socket, self.node_data[nid] + sums))
+        else:
+            self.s.ask(self.acc, node=int(nid), msg=message)
+            self.acc+=1
 
     
-    # def khop_neighborhood(self, nid, k, deltas, num):
-    #     if nid in self.node_data:
-    #         features_sum = self.node_data[nid]
-    #         if k == 0 or not deltas:
-    #             return features_sum
-            
-    #         count = 0
-    #         for neighbor in list(self.graph.neighbors(nid)):
-    #             if len(deltas) > 1:
+    def khop_neighborhood(self, nid, k, deltas, num):
+        kNew = k - 1
 
-    #             print("send to others")
-    #             # features_sum += khop_neighborhood(neighbor, k - 1, deltas[1:])
-    #             # return -1 continue 
-    #             count += 1
-    #             if count == deltas[0]:
-    #                 break
-            
-    #         if count < deltas[0]:
-    #             return -1
-
-    #         return features_sum
+        newDeltas = [i // deltas[0] for i in deltas[1:]]
+        newDeltasList = [newDeltas.copy() for _ in range(deltas[0])]
         
-    #     else:
-    #         print("send to others")
+        for i in range(len(newDeltas)):
+            s = sum(newDeltasList[j][i] for j in range(len(newDeltasList)))
+            if s < deltas[i+1]:
+                idx = random.randint(0, len(newDeltasList) - 1)
+                newDeltasList[idx][i] += 1
+        
+        # print(newDeltasList)
+        
+        if nid in self.node_data:
+            features_sum = self.node_data[nid]
+            if k == 0 or not deltas:
+                return features_sum
+            
+            count = 0
+            for neighbor in list(self.graph.neighbors(nid)):
+                if len(deltas) > 1:
+
+                    print("send to others")
+                # features_sum += khop_neighborhood(neighbor, k - 1, deltas[1:])
+                # return -1 continue 
+                count += 1
+                if count == deltas[0]:
+                    break
+            
+            if count < deltas[0]:
+                return -1
+
+            return features_sum
+        
+        else:
+            print("send to others")
         
 
     # def start_worker(self):

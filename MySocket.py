@@ -19,6 +19,8 @@ class MySocket:
         
         if not client:
             self.serverDict[myNode] = (host, port)
+        
+        if client:
             print("# add any Server")
             n = input("Enter other server partation:")
             ip = input("Enter other server ip address:")

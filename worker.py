@@ -30,39 +30,23 @@ class Worker:
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
 
     def khop_neighborhood(self, nid, k, deltas):
-        if k == 0 or not deltas:
-            return self.node_data(nid)
-
-        current_layer_nodes = {nid}
-        features_sum = 0
-        
-        for deltas_index in range(0, k):
-            total_nodes_needed = deltas[deltas_index]
-            next_layer_nodes = set()
+        if nid in self.node_data:
+            features_sum = self.node_data[nid]
+            if k == 0 or not deltas:
+                return features_sum
             
-            for node in current_layer_nodes:
-                neighbors = list(self.graph.neighbors(node))
-                for neighbor in neighbors:
-                    next_layer_nodes.add(neighbor)
-                    if len(next_layer_nodes) == total_nodes_needed:
-                        break  
-                if len(next_layer_nodes) == total_nodes_needed:
+            count = 0
+            for neighbor in list(self.graph.neighbors(nid)):
+                print("send to others")
+                # features_sum += khop_neighborhood(neighbor, k - 1, deltas[1:])
+                count += 1
+                if count == deltas[0]:
                     break
-            
-            if len(next_layer_nodes) < total_nodes_needed:
-                print("not enough")
 
-            for node in current_layer_nodes:
-                features_sum += int(self.node_data[node])
-            # print(current_layer_nodes)
+            return features_sum
         
-            current_layer_nodes = next_layer_nodes.copy()
-        
-        for node in current_layer_nodes:
-            features_sum += int(self.node_data[node])
-        # print(current_layer_nodes)
-
-        return features_sum
+        else:
+            print("send to others")
         
 
     def start_worker(self):

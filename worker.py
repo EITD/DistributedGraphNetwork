@@ -1,6 +1,7 @@
 import random
 import socket
 from multiprocessing import Process
+import threading
 from ConvertFile import ConvertFile, nx
 import json
 from MySocket import MySocket
@@ -16,7 +17,7 @@ class Worker:
     s = None
     node_data = {}
     graph = {}
-    acc = 0
+    # acc = 0
 
     def __init__(self, wid, p):
         self.worker_id = int(wid)
@@ -33,25 +34,29 @@ class Worker:
     def load_graph_dict(self):
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
 
-    def start_listen(self):
-        client_socket, message = self.s.message_get_queue.get()
+    def handle_msg(self, client_socket, message):
         request_data = json.loads(message)
         if nid in self.node_data:
             if 'node_feature' in request_data:
                 nid = request_data['node_feature']
                 self.s.message_send_queue.put((client_socket, self.node_data[nid]))
-            elif 'khop_neighborhood' in request_data:
-                nid = request_data['nid']
-                k = request_data['k']
-                deltas = request_data['deltas']
+            if 'khop_neighborhood' in request_data:
+                nid = request_data['khop_neighborhood']['nid']
+                k = request_data['khop_neighborhood']['k']
+                deltas = request_data['khop_neighborhood']['deltas']
                 sums = self.khop_neighborhood(nid, k, deltas)
                 self.s.message_send_queue.put((client_socket, self.node_data[nid] + sums))
+            if 'khop_ask_phase' in request_data:
+                nid = request_data['khop_ask_phase']['nid']
+                k = request_data['khop_ask_phase']['k']
+                deltas = request_data['khop_ask_phase']['deltas']
+                if 
         else:
-            self.s.ask(self.acc, node=int(nid), msg=message)
-            self.acc+=1
+            self.s.ask(threading.current_thread().name + nid, node=nid, msg=message)
+            # self.acc+=1
 
     
-    def khop_neighborhood(self, nid, k, deltas, num):
+    def khop_neighborhood(self, nid, k, deltas):
         kNew = k - 1
 
         newDeltas = [i // deltas[0] for i in deltas[1:]]
@@ -70,30 +75,41 @@ class Worker:
         
         # print(newDeltasList)
         
-        if nid in self.node_data:
-            features_sum = self.node_data[nid]
-            if k == 0 or not deltas:
-                return features_sum
-            
-            count = 0
-            for neighbor in list(self.graph.neighbors(nid)):
-                if len(deltas) > 1:
-
-                    print("send to others")
-                # features_sum += khop_neighborhood(neighbor, k - 1, deltas[1:])
-                # return -1 continue 
-                count += 1
-                if count == deltas[0]:
-                    break
-            
-            if count < deltas[0]:
-                return -1
-
-            return features_sum
+        sums = 0
         
-        else:
-            print("send to others")
+        random_neighbors = random.sample(list(self.graph.neighbors(nid)), len(newDeltasList))
         
+        for i in range(len(random_neighbors)):
+            request_data = {
+                'khop_ask_phase': {
+                    'nid': random_neighbors[i],
+                    'k': kNew,
+                    'deltas': newDeltasList[i]
+                }
+            }
+            request_json = json.dumps(request_data)
+            self.s.ask(threading.current_thread().name + random_neighbors[i], random_neighbors[i], request_json)
+            
+            start_to_sum = False
+            okDict = {i: False for i in random_neighbors}
+            
+            while not start_to_sum:
+                for i in range(len(random_neighbors)):
+                    if threading.current_thread().name + random_neighbors[i] in self.s.ask_reply_dict:
+                        
+        #     if len(deltas) > 1:
+
+        #         print("send to others")
+        #     # features_sum += khop_neighborhood(neighbor, k - 1, deltas[1:])
+        #     # return -1 continue 
+        #     count += 1
+        #     if count == deltas[0]:
+        #         break
+        
+        # if count < deltas[0]:
+        #     return -1
+
+        return sums
 
     # def start_worker(self):
     #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -116,8 +132,11 @@ def start_worker(wid, port):
     worker = Worker(wid, port)
     worker.load_node_data()
     worker.load_graph_dict()
-    while(True):
-        worker.start_listen()
+    while True:
+        if not worker.s.message_get_queue.empty():
+            client_socket, message = worker.s.message_get_queue.get()
+            handle_thread = threading.Thread(target=worker.handle_msg, args=(client_socket, message))
+            handle_thread.start()
 
 if __name__ == "__main__":
         w = Process(target=start_worker, args=(sys.argv[1], 12345+int(sys.argv[1])))

@@ -100,7 +100,7 @@ class MySocket:
                 if self.client:
                     client_socket.connect(self.serverDict[-1])
                 else:
-                    client_socket.connect(self.serverDict.get(node % self.NUM_PARTITIONS))
+                    client_socket.connect(self.serverDict.get(int(node) % self.NUM_PARTITIONS))
                 client_socket.send(msg.encode())
                 
                 data = client_socket.recv(1024).decode()

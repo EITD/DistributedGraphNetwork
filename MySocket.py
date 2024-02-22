@@ -1,4 +1,6 @@
+import signal
 import socket
+import sys
 import threading
 import queue
 
@@ -14,6 +16,7 @@ class MySocket:
     serverDict = {}
     NUM_PARTITIONS = None
     client = False
+    alive = True
     
     def __init__(self, myNode, port, NUM_PARTITIONS = 4, client = False):
         host = socket.gethostbyname(socket.gethostname())
@@ -22,12 +25,12 @@ class MySocket:
         self.NUM_PARTITIONS = NUM_PARTITIONS
         self.client = client
         
-        testIp = '130.229.174.26'
+        testIp = host
         if not client:
-            self.serverDict = {0:('130.229.150.211',12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
+            self.serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
             
         if client:
-            self.serverDict = {-1:('130.229.150.211',12345)}
+            self.serverDict = {-1:(testIp,12346)}
         
         # if not client:
         #     self.serverDict[myNode] = (host, port)
@@ -47,7 +50,7 @@ class MySocket:
         #     self.serverDict[int(n)] = (ip, int(p))
 
         self.server_socket.bind((host, port))
-        self.server_socket.listen(5)
+        self.server_socket.listen(100)
         
         send_thread = threading.Thread(target=self.send_back)
         send_thread.start()
@@ -57,9 +60,17 @@ class MySocket:
         
         server_thread = threading.Thread(target=self.handle_client)
         server_thread.start()
+        
+        signal.signal(signal.SIGINT, self.signal_handler)
+    
+    def signal_handler(self, sig, frame):
+        print('Exiting...')
+        self.alive = False
+        self.server_socket.close()
+        sys.exit(0)
 
     def handle_client(self):
-        while True:
+        while self.alive:
             client_socket, _ = self.server_socket.accept()
             
             client_thread = threading.Thread(target=self.handle_client_connection, args=(client_socket,))
@@ -67,12 +78,15 @@ class MySocket:
 
     def handle_client_connection(self, client_socket):
         data = client_socket.recv(1024)
+        print('get msg:', data)
+        
         self.message_get_queue.put((client_socket, data.decode()))
 
     def send_back(self):
-        while True:
+        while self.alive:
             if not self.message_send_queue.empty():
                 client_socket, message = self.message_send_queue.get()
+                print('send out:', message)
                 
                 send_thread = threading.Thread(target=self._send_message, args=(client_socket, message))
                 send_thread.start()
@@ -81,7 +95,7 @@ class MySocket:
         client_socket.send(message.encode())
 
     # def print_message(self):
-    #     while True:
+    #     while self.alive:
     #         if not self.message_get_queue.empty():
     #             client_socket, message = self.message_get_queue.get()
     #             # print('from client socket:', client_socket)
@@ -94,7 +108,7 @@ class MySocket:
         ask_thread.start()
 
     def _ask(self, mid, node, msg):
-        while True:
+        while self.alive:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 if self.client:
@@ -102,6 +116,7 @@ class MySocket:
                 else:
                     client_socket.connect(self.serverDict.get(int(node) % self.NUM_PARTITIONS))
                 client_socket.send(msg.encode())
+                print('ask:', msg)
                 
                 data = client_socket.recv(1024).decode()
                 print('get reply:', data)
@@ -110,6 +125,7 @@ class MySocket:
                 client_socket.close()
                 break
             except (ConnectionRefusedError):
+                print('error')
                 client_socket.close()
                 continue
 

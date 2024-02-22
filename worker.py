@@ -107,7 +107,7 @@ class Worker:
                 k = request_data['khop_neighborhood']['k']
                 deltas = request_data['khop_neighborhood']['deltas']
                 
-                if int(nid) % NUM_PARTITIONS != self.worker_id:
+                if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                     raise NodeForOtherWorker()
                 
                 request_data = {
@@ -118,7 +118,7 @@ class Worker:
                 nid = request_data['feature_and_neighborhood']['nid']
                 delta = request_data['feature_and_neighborhood']['delta']
                 
-                if int(nid) % NUM_PARTITIONS != self.worker_id:
+                if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                     raise NodeForOtherWorker()
                 
                 feature, neighborhoodSet = self.feature_and_neighborhood(nid, delta)

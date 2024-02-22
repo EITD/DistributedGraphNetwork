@@ -7,11 +7,15 @@ import json
 from MySocket import MySocket
 import sys
 
+NUM_PARTITIONS = 4
 # NUM_PARTITIONS_START = 0
 # NUM_PARTITIONS_END = 4
 # PARTITION_LIST = [i for i in range(NUM_PARTITIONS_START, NUM_PARTITIONS_END)]
 NODE_FEATURES = "./data/node_features.txt"
 
+class NodeForOtherWorker(Exception):
+    def __init__(self):
+        pass
 class Worker:
     worker_id = None
     s = None
@@ -21,7 +25,7 @@ class Worker:
 
     def __init__(self, wid, p):
         self.worker_id = int(wid)
-        self.s = MySocket(myNode=wid, port=p, NUM_PARTITIONS=4)
+        self.s = MySocket(myNode=wid, port=p, NUM_PARTITIONS=NUM_PARTITIONS)
 
     def load_node_data(self):
         with open(NODE_FEATURES, 'r') as file:
@@ -29,104 +33,111 @@ class Worker:
         for line in lines:
             parts = line.strip().split()
             if int(parts[0]) % 4 == self.worker_id and len(parts) == 2:
-                self.node_data[parts[0]] = parts[1]
+                self.node_data[parts[0]] = int(parts[1])
 
     def load_graph_dict(self):
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
+        # self.graph = ConvertFile.toGraph(f"./data/test_{self.worker_id}.txt", " ")
+        
+    def node_feature(self, nid):
+        return self.node_data.get(nid, 0)
+        
+    def feature_and_neighborhood(self, nid, delta):
+        node_neighbors_list = list(self.graph.neighbors(nid))
+        random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
+        
+        return self.node_feature(nid), random_neighbors
+    
+    def khop_neighborhood(self, nid, k, deltas):
+        sums = 0
+        node_neighbors_set = set(self.graph.neighbors(nid))
+        
+        for j in range(k): # [2,3,2]
+            random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
+            
+            for node in random_neighbors:
+                if j < k - 1:
+                    request_data = {
+                        'feature_and_neighborhood' : {
+                            'nid' : node,
+                            'delta' : deltas[j + 1]
+                        }
+                    }
+                else:
+                    request_data = {
+                        'node_feature' : node
+                    }
+                request_json = json.dumps(request_data)
+                self.s.ask(threading.current_thread().name + node, node, request_json)
+                
+            okDict = {node:False for node in random_neighbors}
+            node_neighbors_set = set()
+            
+            while not all(value for value in okDict.values()):
+                for node in random_neighbors:
+                    if threading.current_thread().name + node in self.s.ask_reply_dict:
+                        request_data = json.loads(self.s.ask_reply_dict[threading.current_thread().name + node])
+                        
+                        if j < k - 1:
+                            node_neighbors_set.update(request_data['neighborhood'])
+                        sums += request_data['node_feature']
+                        
+                        okDict[node] = True
+                        random_neighbors.remove(node)
+                        break
+        
+        return sums
 
     def handle_msg(self, client_socket, message):
         request_data = json.loads(message)
-        if nid in self.node_data:
+        
+        try:
             if 'node_feature' in request_data:
                 nid = request_data['node_feature']
-                self.s.message_send_queue.put((client_socket, self.node_data[nid]))
-            if 'khop_neighborhood' in request_data:
+                
+                if (int(nid) % NUM_PARTITIONS) != self.worker_id:
+                    raise NodeForOtherWorker()
+                
+                request_data = {
+                    'node_feature' : self.node_feature(nid), # feature
+                }
+                
+            elif 'khop_neighborhood' in request_data:
                 nid = request_data['khop_neighborhood']['nid']
                 k = request_data['khop_neighborhood']['k']
                 deltas = request_data['khop_neighborhood']['deltas']
-                sums = self.khop_neighborhood(nid, k, deltas)
-                self.s.message_send_queue.put((client_socket, self.node_data[nid] + sums))
-            if 'khop_ask_phase' in request_data:
-                nid = request_data['khop_ask_phase']['nid']
-                k = request_data['khop_ask_phase']['k']
-                deltas = request_data['khop_ask_phase']['deltas']
-                if 
-        else:
-            self.s.ask(threading.current_thread().name + nid, node=nid, msg=message)
-            # self.acc+=1
-
-    
-    def khop_neighborhood(self, nid, k, deltas):
-        kNew = k - 1
-
-        newDeltas = [i // deltas[0] for i in deltas[1:]]
-        newDeltasList = [newDeltas.copy() for _ in range(deltas[0])]
-        
-        for i in range(len(newDeltas)):
-            s = sum(newDeltasList[j][i] for j in range(len(newDeltasList)))
-            
-            if s == deltas[i + 1]:
-                continue
-            
-            remaining = deltas[i + 1] - s
-            for _ in range(remaining):
-                idx = random.randint(0, len(newDeltasList) - 1)
-                newDeltasList[idx][i] += 1
-        
-        # print(newDeltasList)
-        
-        sums = 0
-        
-        random_neighbors = random.sample(list(self.graph.neighbors(nid)), len(newDeltasList))
-        
-        for i in range(len(random_neighbors)):
-            request_data = {
-                'khop_ask_phase': {
-                    'nid': random_neighbors[i],
-                    'k': kNew,
-                    'deltas': newDeltasList[i]
+                
+                if int(nid) % NUM_PARTITIONS != self.worker_id:
+                    raise NodeForOtherWorker()
+                
+                request_data = {
+                    'node_feature' : self.khop_neighborhood(nid, k, deltas), # feature
                 }
-            }
+                
+            elif 'feature_and_neighborhood' in request_data:
+                nid = request_data['feature_and_neighborhood']['nid']
+                delta = request_data['feature_and_neighborhood']['delta']
+                
+                if int(nid) % NUM_PARTITIONS != self.worker_id:
+                    raise NodeForOtherWorker()
+                
+                feature, neighborhoodSet = self.feature_and_neighborhood(nid, delta)
+                request_data = {
+                    'node_feature' : feature, # feature
+                    'neighborhood' : neighborhoodSet # [nid, nid, nid...]
+                }
+            
             request_json = json.dumps(request_data)
-            self.s.ask(threading.current_thread().name + random_neighbors[i], random_neighbors[i], request_json)
-            
-            start_to_sum = False
-            okDict = {i: False for i in random_neighbors}
-            
-            while not start_to_sum:
-                for i in range(len(random_neighbors)):
-                    if threading.current_thread().name + random_neighbors[i] in self.s.ask_reply_dict:
-                        
-        #     if len(deltas) > 1:
-
-        #         print("send to others")
-        #     # features_sum += khop_neighborhood(neighbor, k - 1, deltas[1:])
-        #     # return -1 continue 
-        #     count += 1
-        #     if count == deltas[0]:
-        #         break
+        except NodeForOtherWorker:
+            self.s.ask(threading.current_thread().name + nid, node=nid, msg=message)
         
-        # if count < deltas[0]:
-        #     return -1
+            while True:
+                if threading.current_thread().name + nid in self.s.ask_reply_dict:
+                    request_json = self.s.ask_reply_dict[threading.current_thread().name + nid]
+                    break
+        
+        self.s.message_send_queue.put((client_socket, request_json))
 
-        return sums
-
-    # def start_worker(self):
-    #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    #         s.bind(('localhost', self.port))
-    #         s.listen()
-    #         print(f"Worker {self.worker_id} listening on port {self.port}")
-    #         while True:
-    #             conn, addr = s.accept()
-    #             with conn:
-    #                 data = conn.recv(1024).decode()
-    #                 request_data = json.loads(data)
-    #                 nid = request_data['nid']
-    #                 k = request_data['k']
-    #                 deltas = request_data['deltas']
-    #                 result = self.khop_neighborhood(nid, k, deltas)
-    #                 conn.sendall(str(result).encode())
-    
 
 def start_worker(wid, port):
     worker = Worker(wid, port)

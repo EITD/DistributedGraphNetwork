@@ -22,6 +22,8 @@ class Worker:
     node_data = {}
     graph = {}
     # acc = 0
+    epoch = 0
+    graph_weight = [0]
 
     def __init__(self, wid, p):
         self.worker_id = int(wid)
@@ -33,14 +35,16 @@ class Worker:
         for line in lines:
             parts = line.strip().split()
             if int(parts[0]) % 4 == self.worker_id and len(parts) == 2:
-                self.node_data[parts[0]] = [int(parts[1])]
+                self.node_data[parts[0]] = {0:int(parts[1])}
+                self.graph_weight[0] += int(parts[1])
 
     def load_graph_dict(self):
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         # self.graph = ConvertFile.toGraph(f"./data/test_{self.worker_id}.txt", " ")
         
     def node_feature(self, nid):
-        return self.node_data.get(nid, [0])[0]
+        history = self.node_data.get(nid, {})
+        return history.get(self.epoch, 0)
         
     def feature_and_neighborhood(self, nid, delta):
         node_neighbors_list = list(self.graph.neighbors(nid))
@@ -48,7 +52,7 @@ class Worker:
         
         return self.node_feature(nid), random_neighbors
     
-    def khop_neighborhood(self, nid, k, deltas):
+    def khop_neighborhood(self, nid, k, deltas, epoch):
         sums = self.node_feature(nid)
         node_neighbors_set = set(self.graph.neighbors(nid))
         
@@ -88,8 +92,18 @@ class Worker:
         
         return sums
     
-    # def aggregate_neighborhood(self, k, deltas, epochs):
-
+    def aggregate_neighborhood(self, target_epoch):
+        start = self.epoch + 1
+        for e in range(start, target_epoch + 1):
+            sum = 0
+            for node in list(self.node_data.keys()):
+                new_feature = self.khop_neighborhood(node, 0, [0])
+                history = self.node_data.get(node, {})
+                history[e] = new_feature
+                sum += new_feature
+            self.epoch = e
+            self.graph_weight[e] = sum
+        return self.graph_weight[target_epoch]
 
     def handle_msg(self, client_socket, message):
         request_data = json.loads(message)
@@ -131,15 +145,43 @@ class Worker:
                 }
             
             elif 'neighborhood_aggregation' in request_data:
-                nid = request_data['neighborhood_aggregation']['nid']
-                k = request_data['neighborhood_aggregation']['k']
-                deltas = request_data['neighborhood_aggregation']['deltas']
-                epochs = request_data['neighborhood_aggregation']['epochs']
+                final_epoch = request_data['neighborhood_aggregation']['epochs']
+                    
+                request_data = {
+                    'graph_weight': {
+                        'target_epoch': final_epoch
+                    }
+                }
+                request_json = json.dumps(request_data)
 
-                if (int(nid) % NUM_PARTITIONS) != self.worker_id:
-                    raise NodeForOtherWorker()
+                for server in list(self.s.serverDict.keys()):
+                    self.s.ask(threading.current_thread().name + server, node=server, msg=request_json)
                 
-                # send back to client
+                sum_graph = 0
+                okDict = {server:False for server in self.s.serverDict.keys}
+                while not all(value for value in okDict.values()):
+                    for server in self.s.serverDict.keys:
+                        if threading.current_thread().name + server in self.s.ask_reply_dict:
+                            message = self.s.ask_reply_dict.pop(threading.current_thread().name + server)
+                            request_data = json.loads(message)
+                            sum_graph += request_data['graph_weight']
+                            okDict[server] = True
+
+                request_data = {
+                    'sum_graph' : sum_graph
+                }     
+                        
+            elif 'graph_weight' in request_data:
+                target_epoch = request_data['graph_weight']['target_epoch']
+
+                if target_epoch <= self.epoch:
+                    request_data = {
+                        'graph_weight' : self.graph_weight[target_epoch]
+                    } 
+                else:
+                    request_data = {
+                        'graph_weight' : self.aggregate_neighborhood(target_epoch)
+                    }
             
             request_json = json.dumps(request_data)
         except NodeForOtherWorker:

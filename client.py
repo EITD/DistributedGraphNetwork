@@ -26,15 +26,10 @@ def query_khop_neighborhood(nid, k, deltas):
     request_json = json.dumps(request_data)
     s.ask(0, node=nid, msg=request_json)
 
-def aggregate_neighborhood(nid, k, deltas, epochs):
-    if type(deltas) is int:
-        deltas = [deltas]
+def aggregate_neighborhood(nid, epochs):
     request_data = {
         'neighborhood_aggregation': {
-            'nid': str(nid),
-            'k': k,
-            'deltas': deltas,
-            'epoochs': epochs
+            'epochs': epochs
         }
     }
     request_json = json.dumps(request_data)
@@ -47,6 +42,8 @@ def aggregate_neighborhood(nid, k, deltas, epochs):
 
 # query_khop_neighborhood(3, 1, 5)
 
-query_khop_neighborhood(3, 3, [2, 18, 32])
+# query_khop_neighborhood(3, 3, [2, 18, 32])
 
-# aggregate_neighborhood(0, 0, 0, 1)
+aggregate_neighborhood(0, 1)
+
+aggregate_neighborhood(0, 1)

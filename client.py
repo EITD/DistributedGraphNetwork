@@ -46,4 +46,4 @@ def aggregate_neighborhood(nid, epochs):
 
 aggregate_neighborhood(0, 1)
 
-aggregate_neighborhood(0, 1)
+# aggregate_neighborhood(0, 5)

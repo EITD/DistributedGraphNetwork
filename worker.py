@@ -97,7 +97,7 @@ class Worker:
         for e in range(start, target_epoch + 1):
             sum = 0
             for node in list(self.node_data.keys()):
-                new_feature = self.khop_neighborhood(node, 0, [0])
+                new_feature = self.khop_neighborhood(node, 1, [3])
                 history = self.node_data.get(node, {})
                 history[e] = new_feature
                 sum += new_feature

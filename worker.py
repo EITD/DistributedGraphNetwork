@@ -161,7 +161,7 @@ class Worker:
                 okDict = {server:False for server in list(self.s.serverDict.keys())}
                 while not all(value for value in okDict.values()):
                     for server in list(self.s.serverDict.keys()):
-                        if threading.current_thread().name + server in self.s.ask_reply_dict:
+                        if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
                             message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
                             request_data = json.loads(message)
                             sum_graph += request_data['graph_weight']

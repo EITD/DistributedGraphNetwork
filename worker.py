@@ -33,14 +33,14 @@ class Worker:
         for line in lines:
             parts = line.strip().split()
             if int(parts[0]) % 4 == self.worker_id and len(parts) == 2:
-                self.node_data[parts[0]] = int(parts[1])
+                self.node_data[parts[0]] = [int(parts[1])]
 
     def load_graph_dict(self):
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         # self.graph = ConvertFile.toGraph(f"./data/test_{self.worker_id}.txt", " ")
         
     def node_feature(self, nid):
-        return self.node_data.get(nid, 0)
+        return self.node_data.get(nid, [0])[0]
         
     def feature_and_neighborhood(self, nid, delta):
         node_neighbors_list = list(self.graph.neighbors(nid))
@@ -49,7 +49,7 @@ class Worker:
         return self.node_feature(nid), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
-        sums = 0
+        sums = self.node_feature(nid)
         node_neighbors_set = set(self.graph.neighbors(nid))
         
         for j in range(k): # [2,3,2]
@@ -87,6 +87,9 @@ class Worker:
                         break
         
         return sums
+    
+    # def aggregate_neighborhood(self, k, deltas, epochs):
+
 
     def handle_msg(self, client_socket, message):
         request_data = json.loads(message)
@@ -126,6 +129,17 @@ class Worker:
                     'node_feature' : feature, # feature
                     'neighborhood' : neighborhoodSet # [nid, nid, nid...]
                 }
+            
+            elif 'neighborhood_aggregation' in request_data:
+                nid = request_data['neighborhood_aggregation']['nid']
+                k = request_data['neighborhood_aggregation']['k']
+                deltas = request_data['neighborhood_aggregation']['deltas']
+                epochs = request_data['neighborhood_aggregation']['epochs']
+
+                if (int(nid) % NUM_PARTITIONS) != self.worker_id:
+                    raise NodeForOtherWorker()
+                
+                # send back to client
             
             request_json = json.dumps(request_data)
         except NodeForOtherWorker:

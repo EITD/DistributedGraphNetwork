@@ -102,7 +102,7 @@ class Worker:
                 history[e] = new_feature
                 sum += new_feature
             self.epoch = e
-            self.graph_weight[e] = sum
+            self.graph_weight.append(sum)
         return self.graph_weight[target_epoch]
 
     def handle_msg(self, client_socket, message):

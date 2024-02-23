@@ -52,7 +52,7 @@ class Worker:
         
         return self.node_feature(nid), random_neighbors
     
-    def khop_neighborhood(self, nid, k, deltas, epoch):
+    def khop_neighborhood(self, nid, k, deltas):
         sums = self.node_feature(nid)
         node_neighbors_set = set(self.graph.neighbors(nid))
         

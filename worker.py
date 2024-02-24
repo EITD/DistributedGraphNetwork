@@ -80,7 +80,7 @@ class Worker:
             while not all(value for value in okDict.values()):
                 for node in random_neighbors:
                     if threading.current_thread().name + node in self.s.ask_reply_dict:
-                        request_data = json.loads(self.s.ask_reply_dict[threading.current_thread().name + node])
+                        request_data = json.loads(self.s.ask_reply_dict.pop(threading.current_thread().name + node))
                         
                         if j < k - 1:
                             node_neighbors_set.update(request_data['neighborhood'])
@@ -189,7 +189,7 @@ class Worker:
         
             while True:
                 if threading.current_thread().name + nid in self.s.ask_reply_dict:
-                    request_json = self.s.ask_reply_dict[threading.current_thread().name + nid]
+                    request_json = self.s.ask_reply_dict.pop(threading.current_thread().name + nid)
                     break
         
         self.s.message_send_queue.put((client_socket, request_json))

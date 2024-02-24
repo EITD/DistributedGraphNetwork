@@ -128,7 +128,7 @@ class MySocket:
                     print(mid, 'end at:', time.localtime(end))
                     duration = end - start
                     print(mid, 'duration:', duration)
-                print(mid, 'get reply:', data)
+                print('get reply:', data)
                 self.ask_reply_dict[mid] = data
 
                 client_socket.close()

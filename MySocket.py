@@ -3,6 +3,7 @@ import socket
 import sys
 import threading
 import queue
+import time
 
 # NUM_PARTITIONS = 4
 # d = {0:("130.229.150.211",12346), 1:("130.229.150.211",12346), 2:("130.229.150.211",12347), 3:("130.229.150.211",12348)}
@@ -117,8 +118,14 @@ class MySocket:
                     client_socket.connect(self.serverDict.get(int(node) % self.NUM_PARTITIONS))
                 client_socket.send(msg.encode())
                 print('ask:', msg)
+                if self.client:
+                    start = time.time()
                 
                 data = client_socket.recv(1024).decode()
+                if self.client:
+                    end = time.time()
+                    duration = end - start
+                    print(duration)
                 print('get reply:', data)
                 self.ask_reply_dict[mid] = data
 

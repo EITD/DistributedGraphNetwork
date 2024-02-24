@@ -110,7 +110,7 @@ class Worker:
     def aggregate_neighborhood(self, target_epoch):
         # start = self.epoch + 1
         # for e in range(start, target_epoch + 1):
-        while not all(value == target_epoch for key, value in self.epoch.items() if (key % NUM_PARTITIONS) == self.worker_id):
+        while not all(value == target_epoch for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
             for node in list(self.node_data.keys()):
                 if self.epoch[node] < target_epoch:
                     new_feature = self.khop_neighborhood(node, 1, [3])

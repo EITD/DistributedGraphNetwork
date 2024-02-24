@@ -46,7 +46,7 @@ class Worker:
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
         # node_epoch = self.epoch.get(nid, None)
-        return history.get(epoch, None)
+        return history.get(epoch, 0)
         
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list(self.graph.neighbors(nid))
@@ -62,7 +62,8 @@ class Worker:
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
             
             for node in random_neighbors:
-                if self.epoch[node] < self.epoch[nid]:
+                node_epoch = self.epoch.get(node, self.epoch[nid])
+                if node_epoch < self.epoch[nid]:
                     return None
                 
                 if j < k - 1:
@@ -84,8 +85,6 @@ class Worker:
             okDict = {node:False for node in random_neighbors}
             node_neighbors_set = set()
             
-            fail = False
-            
             while not all(value for value in okDict.values()):
                 for node in random_neighbors:
                     if threading.current_thread().name + node in self.s.ask_reply_dict:
@@ -93,17 +92,11 @@ class Worker:
                         
                         if j < k - 1:
                             node_neighbors_set.update(request_data['neighborhood'])
-                        if request_data['node_feature'] is None:
-                            fail = True
-                        else:
-                            sums += request_data['node_feature']
+                        sums += request_data['node_feature']
                         
                         okDict[node] = True
                         random_neighbors.remove(node)
                         break
-            
-            if fail:
-                return None
         
         return sums
     

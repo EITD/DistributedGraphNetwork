@@ -120,13 +120,15 @@ class MySocket:
                 print('ask:', msg)
                 if self.client:
                     start = time.time()
+                    print(mid, 'strat at:', time.localtime(start))
                 
                 data = client_socket.recv(1024).decode()
                 if self.client:
                     end = time.time()
+                    print(mid, 'end at:', time.localtime(end))
                     duration = end - start
-                    print(duration)
-                print('get reply:', data)
+                    print(mid, 'duration:', duration)
+                print(mid, 'get reply:', data)
                 self.ask_reply_dict[mid] = data
 
                 client_socket.close()

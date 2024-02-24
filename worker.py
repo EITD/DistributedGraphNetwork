@@ -34,10 +34,10 @@ class Worker:
             lines = file.readlines()
         for line in lines:
             parts = line.strip().split()
+            self.epoch[parts[0]] = 0
             if int(parts[0]) % 4 == self.worker_id and len(parts) == 2:
                 self.node_data[parts[0]] = {0:int(parts[1])}
                 self.graph_weight[0] += int(parts[1])
-                self.epoch[parts[0]] = 0
 
     def load_graph_dict(self):
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
@@ -62,6 +62,9 @@ class Worker:
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
             
             for node in random_neighbors:
+                if self.epoch[node] < self.epoch[nid]:
+                    return None
+                
                 if j < k - 1:
                     request_data = {
                         'feature_and_neighborhood' : {
@@ -107,20 +110,41 @@ class Worker:
     def aggregate_neighborhood(self, target_epoch):
         # start = self.epoch + 1
         # for e in range(start, target_epoch + 1):
-        while not all(value == target_epoch for value in self.epoch.values()):
+        while not all(value == target_epoch for key, value in self.epoch.items() if key % NUM_PARTITIONS == self.worker_id):
             for node in list(self.node_data.keys()):
-                new_feature = self.khop_neighborhood(node, 1, [3])
-                if new_feature is not None:
-                    history = self.node_data.get(node, {})
-                    my_epoch = sorted(list(history.keys()), reverse=True)[0]
-                    history[my_epoch + 1] = new_feature
-                    if self.graph_weight.get(my_epoch + 1, None) is not None:
-                        self.graph_weight[my_epoch + 1] += new_feature
+                if self.epoch[node] < target_epoch:
+                    new_feature = self.khop_neighborhood(node, 1, [3])
+                    if new_feature is not None:
+                        history = self.node_data.get(node, {})
+                        my_epoch = sorted(list(history.keys()), reverse=True)[0]
+                        history[my_epoch + 1] = new_feature
+
+                        if self.graph_weight.get(my_epoch + 1, None) is not None:
+                            self.graph_weight[my_epoch + 1] += new_feature
+                        else:
+                            self.graph_weight[my_epoch + 1] = new_feature
+                        
+                        self.epoch[node] += 1
+                        request_data = {
+                            'update_node_epoch': {
+                                'nid': node,
+                                'epoch': self.epoch[node]
+                            }
+                        }
+                        request_json = json.dumps(request_data)
+                        for server in list(self.s.serverDict.keys()):
+                            self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
+
+                        okDict = {server:False for server in list(self.s.serverDict.keys())}
+                        while not all(value for value in okDict.values()):
+                            for server in list(self.s.serverDict.keys()):
+                                if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
+                                    message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
+                                    request_data = json.loads(message)
+                                    if request_data['update_epoch_ack'] == "ok":
+                                        okDict[server] = True
                     else:
-                        self.graph_weight[my_epoch + 1] = new_feature
-                    self.epoch[node] += 1
-                else:
-                    continue
+                        continue
         return self.graph_weight[target_epoch]
 
     def handle_msg(self, client_socket, message):
@@ -204,6 +228,16 @@ class Worker:
                     request_data = {
                         'graph_weight' : self.aggregate_neighborhood(target_epoch)
                     }
+            
+            elif 'update_node_epoch' in request_data:
+                node = request_data['update_node_epoch']['nid']
+                epoch = request_data['update_node_epoch']['epoch']
+
+                self.epoch[node] = epoch
+
+                request_data = {
+                    'update_epoch_ack' : "ok"
+                }
             
             request_json = json.dumps(request_data)
         except NodeForOtherWorker:

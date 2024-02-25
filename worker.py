@@ -147,14 +147,14 @@ class Worker:
         node_apoch_dic = []
         for node in self.filter_nodes(target_epoch): 
                # print("node value " + str(node))
-                new_feature = self.khop_neighborhood(int(node), 1, [3])
+                new_feature = self.khop_neighborhood(node, 1, [3])
                 if new_feature is not None:
                     history = self.node_data.get(node, {})
                     my_epoch = sorted(list(history.keys()), reverse=True)[0]  + 1
                     history[my_epoch] = new_feature
                     self.graph_weight[my_epoch] = self.graph_weight.get(my_epoch, 0) + new_feature    
                     self.epoch[node] += 1
-                    node_apoch_dic.append(node, self.epoch[node]) 
+                    node_apoch_dic.append((node, self.epoch[node])) 
         self.update_node_epoch_and_wait_for_ack(node_apoch_dic)
         return self.graph_weight[target_epoch]
     

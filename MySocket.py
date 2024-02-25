@@ -26,7 +26,7 @@ class MySocket:
         self.NUM_PARTITIONS = NUM_PARTITIONS
         self.client = client
         
-        testIp = '130.229.146.36'
+        testIp = host
         if not client:
             self.serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
             
@@ -49,7 +49,7 @@ class MySocket:
         #     ip = input("Enter other server ip address:")
         #     p = input("Enter other server port:")
         #     self.serverDict[int(n)] = (ip, int(p))
-
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((host, port))
         self.server_socket.listen(100)
         

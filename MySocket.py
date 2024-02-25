@@ -83,6 +83,7 @@ class MySocket:
         
         self.message_get_queue.put((client_socket, data.decode()))
 
+
     def send_back(self):
         while self.alive:
             if not self.message_send_queue.empty():
@@ -107,7 +108,7 @@ class MySocket:
     def ask(self, mid, node, msg):
         ask_thread = threading.Thread(target=self._ask, args=(mid, node, msg))
         ask_thread.start()
-
+    
     def _ask(self, mid, node, msg):
         while self.alive:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

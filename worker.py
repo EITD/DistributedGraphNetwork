@@ -6,12 +6,20 @@ from ConvertFile import ConvertFile, nx
 import json
 from MySocket import MySocket
 import sys
+from decorators import timeit
 
 NUM_PARTITIONS = 4
 # NUM_PARTITIONS_START = 0
 # NUM_PARTITIONS_END = 4
 # PARTITION_LIST = [i for i in range(NUM_PARTITIONS_START, NUM_PARTITIONS_END)]
 NODE_FEATURES = "./data/node_features.txt"
+
+try:
+    profile
+except NameError:
+    def profile(func):
+        return func
+
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -29,6 +37,8 @@ class Worker:
         self.worker_id = int(wid)
         self.s = MySocket(myNode=wid, port=p, NUM_PARTITIONS=NUM_PARTITIONS)
 
+    @profile
+    @timeit
     def load_node_data(self):
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
@@ -38,23 +48,30 @@ class Worker:
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
                 self.node_data[parts[0]] = {0:int(parts[1])}
                 self.graph_weight[0] += int(parts[1])
-
+    @profile
+    @timeit
     def load_graph_dict(self):
         # print(self.worker_id)
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         # self.graph = ConvertFile.toGraph(f"./data/test_{self.worker_id}.txt", " ")
         
+    @profile
+    @timeit   
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
         # node_epoch = self.epoch.get(nid, None)
         return history.get(epoch, 0)
-        
+    
+    @profile
+    @timeit  
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list(self.graph.neighbors(nid))
         random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
         
         return self.node_feature(nid, epoch), random_neighbors
     
+    @profile
+    @timeit  
     def khop_neighborhood(self, nid, k, deltas):
         sums = self.node_feature(nid, self.epoch[nid])
         node_neighbors_set = set(self.graph.neighbors(nid))
@@ -101,6 +118,8 @@ class Worker:
         
         return sums
     
+    @profile
+    @timeit  
     def aggregate_neighborhood(self, target_epoch):
         # start = self.epoch + 1
         # for e in range(start, target_epoch + 1):
@@ -147,23 +166,24 @@ class Worker:
                         continue
         return self.graph_weight[target_epoch]
 
-    def aggregate_neighborhood_improve(self, target_epoch):
-        # start = self.epoch + 1
-        # for e in range(start, target_epoch + 1):
-        node_apoch_dic = []
-        for node in self.filter_nodes(target_epoch): 
-                # print("node value " + str(node))
-                new_feature = self.khop_neighborhood(node, 1, [3])
-                if new_feature is not None:
-                    history = self.node_data.get(node, {})
-                    my_epoch = sorted(list(history.keys()), reverse=True)[0]  + 1
-                    history[my_epoch] = new_feature
-                    self.graph_weight[my_epoch] = self.graph_weight.get(my_epoch, 0) + new_feature    
-                    self.epoch[node] += 1
-                    node_apoch_dic.append((node, self.epoch[node])) 
-        self.update_node_epoch_and_wait_for_ack(node_apoch_dic)
-        return self.graph_weight[target_epoch]
+    # def aggregate_neighborhood_improve(self, target_epoch):
+    #     # start = self.epoch + 1
+    #     # for e in range(start, target_epoch + 1):
+    #     node_apoch_dic = []
+    #     for node in self.filter_nodes(target_epoch): 
+    #             # print("node value " + str(node))
+    #             new_feature = self.khop_neighborhood(node, 1, [3])
+    #             if new_feature is not None:
+    #                 history = self.node_data.get(node, {})
+    #                 my_epoch = sorted(list(history.keys()), reverse=True)[0]  + 1
+    #                 history[my_epoch] = new_feature
+    #                 self.graph_weight[my_epoch] = self.graph_weight.get(my_epoch, 0) + new_feature    
+    #                 self.epoch[node] += 1
+    #                 node_apoch_dic.append((node, self.epoch[node])) 
+    #     self.update_node_epoch_and_wait_for_ack(node_apoch_dic)
+    #     return self.graph_weight[target_epoch]
     
+    @timeit  
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
@@ -191,6 +211,8 @@ class Worker:
                         if request_data.get('update_epoch_ack') == "ok":
                             okDict[server] = True
 
+    @profile
+    @timeit  
     def handle_msg(self, client_socket, message):
         request_data = json.loads(message)
         
@@ -294,7 +316,8 @@ class Worker:
         
         self.s.message_send_queue.put((client_socket, request_json))
 
-
+@profile
+@timeit  
 def start_worker(wid, port):
     worker = Worker(wid, port)
     worker.load_node_data()
@@ -306,5 +329,5 @@ def start_worker(wid, port):
             handle_thread.start()
 
 if __name__ == "__main__":
-        w = Process(target=start_worker, args=(sys.argv[1], 12345+int(sys.argv[1])))
-        w.start()
+    start_worker(sys.argv[1], 12345+int(sys.argv[1]))
+

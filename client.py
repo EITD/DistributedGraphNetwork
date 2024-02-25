@@ -3,6 +3,12 @@ import socket
 import json
 import sys
 from MySocket import MySocket
+from decorators import timeit
+try:
+    profile
+except NameError:
+    def profile(func):
+        return func
 
 s = MySocket(myNode=None, port=10000, NUM_PARTITIONS=4, client=True)
 
@@ -26,6 +32,8 @@ def query_khop_neighborhood(nid, k, deltas):
     request_json = json.dumps(request_data)
     s.ask(0, node=nid, msg=request_json)
 
+@timeit
+@profile
 def aggregate_neighborhood(nid, epochs):
     request_data = {
         'neighborhood_aggregation': {

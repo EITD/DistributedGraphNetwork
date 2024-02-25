@@ -165,14 +165,14 @@ class Worker:
             for server in list(self.s.serverDict.keys()):
                 self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
 
-            okDict = {server:False for server in list(self.s.serverDict.keys())}
-            while not all(value for value in okDict.values()):
-                for server in list(self.s.serverDict.keys()):
-                    if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
-                        message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
-                        request_data = json.loads(message)
-                        if request_data['update_epoch_ack'] == "ok":
-                            okDict[server] = True
+            # okDict = {server:False for server in list(self.s.serverDict.keys())}
+            # while not all(value for value in okDict.values()):
+            #     for server in list(self.s.serverDict.keys()):
+            #         if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
+            #             message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
+            #             request_data = json.loads(message)
+            #             if request_data['update_epoch_ack'] == "ok":
+            #                 okDict[server] = True
         
     # def update_node_epoch_and_wait_for_ack(self, node_apoch_dic):
     #     for node, epoch in node_apoch_dic:

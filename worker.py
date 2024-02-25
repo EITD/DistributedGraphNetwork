@@ -312,5 +312,6 @@ def start_worker(wid, port):
             handle_thread.start()
 
 if __name__ == "__main__":
-        w = Process(target=start_worker, args=(sys.argv[1], 12345+int(sys.argv[1])))
-        w.start()
+        start_worker(sys.argv[1], 12345+int(sys.argv[1]))
+        # w = Process(target=start_worker, args=(sys.argv[1], 12345+int(sys.argv[1])))
+        # w.start()

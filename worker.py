@@ -110,86 +110,89 @@ class Worker:
             random.shuffle(filter_nodes)
             for node in filter_nodes: 
                 # if self.epoch[node] < target_epoch:
-                    new_feature = self.khop_neighborhood(node, 1, [3])
-                    if new_feature is not None:
-                        history = self.node_data.get(node, {})
-                        my_epoch = sorted(list(history.keys()), reverse=True)[0]  
-                        history[my_epoch + 1] = new_feature
-
-                        if self.graph_weight.get(my_epoch + 1, None) is not None:
-                            self.graph_weight[my_epoch + 1] += new_feature
-                        else:
-                            self.graph_weight[my_epoch + 1] = new_feature
-
-                        self.epoch[node] += 1
-                        if self.epoch[node] >= target_epoch:
-                            filter_nodes.remove(node)
-                        
-                        request_data = {
-                            'update_node_epoch': {
-                                'nid': node,
-                                'epoch': self.epoch[node]
-                            }
-                        }
-                        request_json = json.dumps(request_data)
-                        for server in list(self.s.serverDict.keys()):
-                            self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
-
-                        okDict = {server:False for server in list(self.s.serverDict.keys())}
-                        while not all(value for value in okDict.values()):
-                            for server in list(self.s.serverDict.keys()):
-                                if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
-                                    message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
-                                    request_data = json.loads(message)
-                                    if request_data['update_epoch_ack'] == "ok":
-                                        okDict[server] = True
-                    else:
-                        continue
+                update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
+                update_node_epoch_thread.start()
+                    
         return self.graph_weight[target_epoch]
 
-    def aggregate_neighborhood_improve(self, target_epoch):
-        # start = self.epoch + 1
-        # for e in range(start, target_epoch + 1):
-        node_apoch_dic = []
-        for node in self.filter_nodes(target_epoch): 
-                # print("node value " + str(node))
-                new_feature = self.khop_neighborhood(node, 1, [3])
-                if new_feature is not None:
-                    history = self.node_data.get(node, {})
-                    my_epoch = sorted(list(history.keys()), reverse=True)[0]  + 1
-                    history[my_epoch] = new_feature
-                    self.graph_weight[my_epoch] = self.graph_weight.get(my_epoch, 0) + new_feature    
-                    self.epoch[node] += 1
-                    node_apoch_dic.append((node, self.epoch[node])) 
-        self.update_node_epoch_and_wait_for_ack(node_apoch_dic)
-        return self.graph_weight[target_epoch]
+    # def aggregate_neighborhood_improve(self, target_epoch):
+    #     # start = self.epoch + 1
+    #     # for e in range(start, target_epoch + 1):
+    #     node_apoch_dic = []
+    #     for node in self.filter_nodes(target_epoch): 
+    #             # print("node value " + str(node))
+    #             new_feature = self.khop_neighborhood(node, 1, [3])
+    #             if new_feature is not None:
+    #                 history = self.node_data.get(node, {})
+    #                 my_epoch = sorted(list(history.keys()), reverse=True)[0]  + 1
+    #                 history[my_epoch] = new_feature
+    #                 self.graph_weight[my_epoch] = self.graph_weight.get(my_epoch, 0) + new_feature    
+    #                 self.epoch[node] += 1
+    #                 node_apoch_dic.append((node, self.epoch[node])) 
+    #     self.update_node_epoch_and_wait_for_ack(node_apoch_dic)
+    #     return self.graph_weight[target_epoch]
     
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
-        
-    def update_node_epoch_and_wait_for_ack(self, node_apoch_dic):
-        for node, epoch in node_apoch_dic:
+    
+    def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
+        new_feature = self.khop_neighborhood(node, 1, [3])
+        if new_feature is not None:
+            history = self.node_data.get(node, {})
+            my_epoch = sorted(list(history.keys()), reverse=True)[0]  
+            history[my_epoch + 1] = new_feature
+
+            if self.graph_weight.get(my_epoch + 1, None) is not None:
+                self.graph_weight[my_epoch + 1] += new_feature
+            else:
+                self.graph_weight[my_epoch + 1] = new_feature
+
+            self.epoch[node] += 1
+            if self.epoch[node] >= target_epoch:
+                filter_nodes.remove(node)
+            
             request_data = {
                 'update_node_epoch': {
                     'nid': node,
-                    'epoch': epoch
+                    'epoch': self.epoch[node]
                 }
             }
             request_json = json.dumps(request_data)
-            for server in self.s.serverDict.keys():
+            for server in list(self.s.serverDict.keys()):
                 self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
-            # Initialize okDict for all servers
-            okDict = {server: False for server in self.s.serverDict.keys()}
-            # Wait for all acknowledgements
-            while not all(okDict.values()):
-                for server in self.s.serverDict.keys():
-                    thread_name = threading.current_thread().name + str(server)
-                    if thread_name in self.s.ask_reply_dict:
-                        message = self.s.ask_reply_dict.pop(thread_name)
+
+            okDict = {server:False for server in list(self.s.serverDict.keys())}
+            while not all(value for value in okDict.values()):
+                for server in list(self.s.serverDict.keys()):
+                    if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
+                        message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
                         request_data = json.loads(message)
-                        if request_data.get('update_epoch_ack') == "ok":
+                        if request_data['update_epoch_ack'] == "ok":
                             okDict[server] = True
+        
+    # def update_node_epoch_and_wait_for_ack(self, node_apoch_dic):
+    #     for node, epoch in node_apoch_dic:
+    #         request_data = {
+    #             'update_node_epoch': {
+    #                 'nid': node,
+    #                 'epoch': epoch
+    #             }
+    #         }
+    #         request_json = json.dumps(request_data)
+    #         for server in self.s.serverDict.keys():
+    #             self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
+    #         # Initialize okDict for all servers
+    #         okDict = {server: False for server in self.s.serverDict.keys()}
+    #         # Wait for all acknowledgements
+    #         while not all(okDict.values()):
+    #             for server in self.s.serverDict.keys():
+    #                 thread_name = threading.current_thread().name + str(server)
+    #                 if thread_name in self.s.ask_reply_dict:
+    #                     message = self.s.ask_reply_dict.pop(thread_name)
+    #                     request_data = json.loads(message)
+    #                     if request_data.get('update_epoch_ack') == "ok":
+    #                         okDict[server] = True
 
     def handle_msg(self, client_socket, message):
         request_data = json.loads(message)

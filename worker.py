@@ -6,6 +6,7 @@ from ConvertFile import ConvertFile, nx
 import json
 from MySocket import MySocket
 import sys
+import concurrent.futures
 
 NUM_PARTITIONS = 4
 # NUM_PARTITIONS_START = 0
@@ -110,8 +111,10 @@ class Worker:
             random.shuffle(filter_nodes)
             for node in filter_nodes: 
                 # if self.epoch[node] < target_epoch:
-                update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
-                update_node_epoch_thread.start()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
+                # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
+                # update_node_epoch_thread.start()
                     
         return self.graph_weight[target_epoch]
 

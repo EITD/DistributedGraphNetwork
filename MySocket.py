@@ -1,9 +1,11 @@
+import multiprocessing
 import signal
 import socket
 import sys
 import threading
 import queue
 import time
+import concurrent.futures
 
 # NUM_PARTITIONS = 4
 # d = {0:("130.229.150.211",12346), 1:("130.229.150.211",12346), 2:("130.229.150.211",12347), 3:("130.229.150.211",12348)}
@@ -53,13 +55,13 @@ class MySocket:
         self.server_socket.bind((host, port))
         self.server_socket.listen(100)
         
-        send_thread = threading.Thread(target=self.send_back)
+        send_thread = multiprocessing.Process(target=self.send_back)
         send_thread.start()
         
         # msg_thread = threading.Thread(target=self.print_message)
         # msg_thread.start()
         
-        server_thread = threading.Thread(target=self.handle_client)
+        server_thread = multiprocessing.Process(target=self.handle_client)
         server_thread.start()
         
         signal.signal(signal.SIGINT, self.signal_handler)

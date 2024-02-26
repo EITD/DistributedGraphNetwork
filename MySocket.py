@@ -132,7 +132,7 @@ class MySocket:
                     print(mid, 'duration:', duration)
                 if data != "":
                     print('get reply:', data)
-                self.ask_reply_dict[mid] = data
+                    self.ask_reply_dict[mid] = data
 
                 client_socket.close()
                 break
@@ -140,6 +140,10 @@ class MySocket:
                 print('error')
                 client_socket.close()
                 continue
+            # except (BrokenPipeError):
+            #     print('break')
+            #     client_socket.close()
+            #     break
 
 # s = MySocket(myNode=1, port=12345, serverDict=d)
 

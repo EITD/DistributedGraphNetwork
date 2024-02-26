@@ -130,10 +130,10 @@ class Worker:
             # random.shuffle(filter_nodes)
             for node in filter_nodes: 
                 # if self.epoch[node] < target_epoch:
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                        executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
-                    # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
-                    # update_node_epoch_thread.start()
+                    # with concurrent.futures.ThreadPoolExecutor() as executor:
+                    #     executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
+                    update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
+                    update_node_epoch_thread.start()
                     
         # return self.graph_weight[target_epoch]
 
@@ -281,20 +281,20 @@ class Worker:
                 for server in list(self.s.serverDict.keys()):
                     self.s.ask(threading.current_thread().name + str(server), server, request_data)
                 
-                # new_epoch = {}
+                new_epoch = {}
                 okDict = {server:False for server in list(self.s.serverDict.keys())}
                 while not all(value for value in okDict.values()):
                     for server in list(self.s.serverDict.keys()):
                         if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
                             message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
                             request_data = ast.literal_eval(message)
-                            new_epoch.update(request_data[0])
+                            # new_epoch.update(request_data[0])
                             okDict[server] = True
 
                 # request_data = {
                 #     'new_epoch' : new_epoch
                 # }
-                request_data = str((new_epoch, ))
+                request_data = str(("all_epoch_ok"))
                         
             elif 'graph_weight' in request_data:
                 target_epoch = request_data[1]
@@ -308,7 +308,8 @@ class Worker:
                 # request_data = {
                 #         'new_epoch' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                 #     }
-                request_data = str(({nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}, ))
+                # request_data = str(({nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}, ))
+                request_data = str(("graph_epoch_ok"))
             
             elif 'update_node_epoch' in request_data:
                 node = request_data[1]
@@ -319,7 +320,8 @@ class Worker:
                 # request_data = {
                 #     'update_epoch_ack' : "ok"
                 # }
-                return
+                # return
+                request_data = str(("ok"))
             
             # request_json = json.dumps(request_data)
         except NodeForOtherWorker:

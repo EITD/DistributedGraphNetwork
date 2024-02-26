@@ -83,10 +83,10 @@ class Worker:
                         # }
                         self.s.ask(threading.current_thread().name + node, node, str(('feature_and_neighborhood', node, deltas[j + 1], self.epoch[nid])))
                     else:
-                        request_data = {
-                            'node_feature' : node,
-                            'epoch' : self.epoch[nid]
-                        }
+                        # request_data = {
+                        #     'node_feature' : node,
+                        #     'epoch' : self.epoch[nid]
+                        # }
                         self.s.ask(threading.current_thread().name + node, node, str(('node_feature', node, self.epoch[nid])))
                     # request_json = json.dumps(request_data)
                     # self.s.ask(threading.current_thread().name + node, node, request_json)
@@ -112,8 +112,8 @@ class Worker:
                         request_data = ast.literal_eval(self.s.ask_reply_dict.pop(threading.current_thread().name + node))
                         
                         if j < k - 1:
-                            node_neighbors_set.update(request_data[0])
-                        sums += request_data[1]
+                            node_neighbors_set.update(request_data[1])
+                        sums += request_data[0]
                         
                         okDict[node] = True
                         random_neighbors.remove(node)
@@ -234,7 +234,7 @@ class Worker:
                 # request_data = {
                 #     'node_feature' : self.node_feature(nid, epoch), # feature
                 # }
-                request_data = str(self.node_feature(nid, epoch))
+                request_data = str((self.node_feature(nid, epoch), ))
                 
             elif 'khop_neighborhood' in request_data:
                 nid = request_data[1]
@@ -250,7 +250,7 @@ class Worker:
                 #     'node_feature' : sums if sums is not None else 'Not available.', # feature
                 # }
                 
-                request_data = str(sums if sums is not None else 'Not available.')
+                request_data = str((sums if sums is not None else 'Not available.', ))
                 
             elif 'feature_and_neighborhood' in request_data:
                 nid = request_data[1]
@@ -265,7 +265,7 @@ class Worker:
                 #     'node_feature' : feature,
                 #     'neighborhood' : neighborhoodSet
                 # }
-                request_data = str(feature, neighborhoodSet)
+                request_data = str((feature, neighborhoodSet))
             
             elif 'neighborhood_aggregation' in request_data:
                 final_epoch = request_data[1]
@@ -294,7 +294,7 @@ class Worker:
                 # request_data = {
                 #     'new_epoch' : new_epoch
                 # }
-                request_data = str((new_epoch))
+                request_data = str((new_epoch, ))
                         
             elif 'graph_weight' in request_data:
                 target_epoch = request_data[1]
@@ -308,7 +308,7 @@ class Worker:
                 # request_data = {
                 #         'new_epoch' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                 #     }
-                request_data = str(({nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}))
+                request_data = str(({nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}, ))
             
             elif 'update_node_epoch' in request_data:
                 node = request_data[1]

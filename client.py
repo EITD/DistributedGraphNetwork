@@ -42,10 +42,10 @@ def aggregate_neighborhood(nid, epochs):
 
 # query_node_feature(1)
 
-# query_khop_neighborhood(3, 1, 5)
+# query_khop_neighborhood(3, 1, 3)
 
-# query_khop_neighborhood(3, 3, [2, 18, 32])
+query_khop_neighborhood(3, 3, [2, 18, 32])
 
-aggregate_neighborhood(0, 2)
+# aggregate_neighborhood(0, 2)
 
 # aggregate_neighborhood(0, 5)

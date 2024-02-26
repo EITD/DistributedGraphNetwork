@@ -51,7 +51,7 @@ class MySocket:
         #     self.serverDict[int(n)] = (ip, int(p))
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((host, port))
-        self.server_socket.listen(100)
+        self.server_socket.listen(1000)
         
         send_thread = threading.Thread(target=self.send_back)
         send_thread.start()
@@ -78,7 +78,7 @@ class MySocket:
             client_thread.start()
 
     def handle_client_connection(self, client_socket):
-        data = client_socket.recv(8192)
+        data = client_socket.recv(102400)
         print('get msg:', data)
         
         self.message_get_queue.put((client_socket, data.decode()))
@@ -89,13 +89,13 @@ class MySocket:
                 client_socket, message = self.message_send_queue.get()
                 print('send out:', message)
                 
-                client_socket.send(message.encode())
+                # client_socket.send(message.encode())
                 
-                # send_thread = threading.Thread(target=self._send_message, args=(client_socket, message))
-                # send_thread.start()
+                send_thread = threading.Thread(target=self._send_message, args=(client_socket, message))
+                send_thread.start()
 
-    # def _send_message(self, client_socket, message):
-    #     client_socket.send(message.encode())
+    def _send_message(self, client_socket, message):
+        client_socket.send(message.encode())
 
     # def print_message(self):
     #     while self.alive:
@@ -124,7 +124,7 @@ class MySocket:
                     start = time.time()
                     print(mid, 'start at:', time.localtime(start))
                 
-                data = client_socket.recv(8192).decode()
+                data = client_socket.recv(102400).decode()
                 if self.client:
                     end = time.time()
                     print(mid, 'end at:', time.localtime(end))

@@ -123,13 +123,13 @@ class Worker:
         filter_nodes = self.filter_nodes(target_epoch)
         # while not all(value == target_epoch for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
         while filter_nodes:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
             # random.shuffle(filter_nodes)
                 for node in filter_nodes: 
                 # if self.epoch[node] < target_epoch:
-                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
-                # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
-                # update_node_epoch_thread.start()
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                        executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
+                    # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
+                    # update_node_epoch_thread.start()
                     
         # return self.graph_weight[target_epoch]
 
@@ -155,7 +155,7 @@ class Worker:
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
     def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
-        new_feature = self.khop_neighborhood(node, 1, [3])
+        new_feature = self.khop_neighborhood(node, 0, [0])
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]  
@@ -268,18 +268,19 @@ class Worker:
                 for server in list(self.s.serverDict.keys()):
                     self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
                 
-                new_epoch = {}
+                # new_epoch = {}
                 okDict = {server:False for server in list(self.s.serverDict.keys())}
                 while not all(value for value in okDict.values()):
                     for server in list(self.s.serverDict.keys()):
                         if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
                             message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
                             request_data = json.loads(message)
-                            new_epoch.update(request_data['new_epoch'])
+                            # new_epoch.update(request_data['new_epoch'])
                             okDict[server] = True
 
                 request_data = {
-                    'new_epoch' : new_epoch
+                    # 'new_epoch' : new_epoch
+                    'new_epoch': "ok"
                 }     
                         
             elif 'graph_weight' in request_data:
@@ -292,7 +293,8 @@ class Worker:
                 #     } 
                 # else:
                 request_data = {
-                        'new_epoch' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                        'new_epoch': "ok"
+                        # 'new_epoch' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                     }
             
             elif 'update_node_epoch' in request_data:

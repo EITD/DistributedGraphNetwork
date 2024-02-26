@@ -63,14 +63,13 @@ class Worker:
         for j in range(k): # [2,3,2]
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
             
+            inMyself = []
             for node in random_neighbors:
                 node_epoch = self.epoch.get(node, self.epoch[nid])
                 if node_epoch < self.epoch[nid]:
                     return None
                 
-                # TODO: 自己的节点别问了，问别人的
-                inMyself = []
-                if node % NUM_PARTITIONS == self.worker_id:
+                if (int(node) % NUM_PARTITIONS) == self.worker_id:
                     inMyself.append(node)
                 else:
                     if j < k - 1:
@@ -89,8 +88,19 @@ class Worker:
                     request_json = json.dumps(request_data)
                     self.s.ask(threading.current_thread().name + node, node, request_json)
 
+            random_neighbors = [node for node in random_neighbors if node not in inMyself]
             okDict = {node:False for node in random_neighbors}
             node_neighbors_set = set()
+            
+            for node in inMyself:
+                print(f'!!!self get: {node}!!!')
+                if j < k - 1:
+                    node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch[nid])
+                    node_neighbors_set.update(neighborhood)
+                    sums += node_feature
+                else:
+                    node_feature = self.node_feature(node, self.epoch[nid])
+                    sums += node_feature
             
             while not all(value for value in okDict.values()):
                 for node in random_neighbors:
@@ -167,7 +177,7 @@ class Worker:
                 }
             }
             request_json = json.dumps(request_data)
-            for server in list(self.s.serverDict.keys()):
+            for server in [server for server in list(self.s.serverDict.keys()) if server != self.worker_id]:
                 self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
 
             # okDict = {server:False for server in list(self.s.serverDict.keys())}

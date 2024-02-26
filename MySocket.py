@@ -78,7 +78,7 @@ class MySocket:
             client_thread.start()
 
     def handle_client_connection(self, client_socket):
-        data = client_socket.recv(1024)
+        data = client_socket.recv(4096)
         print('get msg:', data)
         
         self.message_get_queue.put((client_socket, data.decode()))
@@ -122,7 +122,7 @@ class MySocket:
                     start = time.time()
                     print(mid, 'start at:', time.localtime(start))
                 
-                data = client_socket.recv(1024).decode()
+                data = client_socket.recv(4096).decode()
                 if self.client:
                     end = time.time()
                     print(mid, 'end at:', time.localtime(end))

@@ -24,7 +24,7 @@ class Worker:
     graph = {}
     # acc = 0
     epoch = {}
-    graph_weight = {0:0}
+    # graph_weight = {0:0}
 
     def __init__(self, wid, p):
         self.worker_id = int(wid)
@@ -38,7 +38,7 @@ class Worker:
             self.epoch[parts[0]] = 0
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
                 self.node_data[parts[0]] = {0:int(parts[1])}
-                self.graph_weight[0] += int(parts[1])
+                # self.graph_weight[0] += int(parts[1])
 
     def load_graph_dict(self):
         # print(self.worker_id)
@@ -123,15 +123,15 @@ class Worker:
         filter_nodes = self.filter_nodes(target_epoch)
         # while not all(value == target_epoch for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
         while filter_nodes:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
             # random.shuffle(filter_nodes)
-            for node in filter_nodes: 
+                for node in filter_nodes: 
                 # if self.epoch[node] < target_epoch:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
                     executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
                 # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
                 # update_node_epoch_thread.start()
                     
-        return self.graph_weight[target_epoch]
+        # return self.graph_weight[target_epoch]
 
     # def aggregate_neighborhood_improve(self, target_epoch):
     #     # start = self.epoch + 1
@@ -161,10 +161,10 @@ class Worker:
             my_epoch = sorted(list(history.keys()), reverse=True)[0]  
             history[my_epoch + 1] = new_feature
 
-            if self.graph_weight.get(my_epoch + 1, None) is not None:
-                self.graph_weight[my_epoch + 1] += new_feature
-            else:
-                self.graph_weight[my_epoch + 1] = new_feature
+            # if self.graph_weight.get(my_epoch + 1, None) is not None:
+            #     self.graph_weight[my_epoch + 1] += new_feature
+            # else:
+            #     self.graph_weight[my_epoch + 1] = new_feature
 
             self.epoch[node] += 1
             if self.epoch[node] >= target_epoch:
@@ -268,30 +268,31 @@ class Worker:
                 for server in list(self.s.serverDict.keys()):
                     self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
                 
-                sum_graph = 0
+                new_epoch = {}
                 okDict = {server:False for server in list(self.s.serverDict.keys())}
                 while not all(value for value in okDict.values()):
                     for server in list(self.s.serverDict.keys()):
                         if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
                             message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
                             request_data = json.loads(message)
-                            sum_graph += request_data['graph_weight']
+                            new_epoch.update(request_data['new_epoch'])
                             okDict[server] = True
 
                 request_data = {
-                    'sum_graph' : sum_graph
+                    'new_epoch' : new_epoch
                 }     
                         
             elif 'graph_weight' in request_data:
                 target_epoch = request_data['graph_weight']['target_epoch']
 
-                if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
-                    request_data = {
-                        'graph_weight' : self.graph_weight[target_epoch]
-                    } 
-                else:
-                    request_data = {
-                        'graph_weight' : self.aggregate_neighborhood(target_epoch)
+                if target_epoch > sorted(list(set(self.epoch.values())))[0]:
+                    self.aggregate_neighborhood(target_epoch)
+                #     request_data = {
+                #         'new_epoch' : 
+                #     } 
+                # else:
+                request_data = {
+                        'new_epoch' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                     }
             
             elif 'update_node_epoch' in request_data:
@@ -324,6 +325,8 @@ def start_worker(wid, port):
     while True:
         if not worker.s.message_get_queue.empty():
             client_socket, message = worker.s.message_get_queue.get()
+            # with concurrent.futures.ThreadPoolExecutor() as handle_thread:
+            #     handle_thread.submit(worker.handle_msg, client_socket, message)
             handle_thread = threading.Thread(target=worker.handle_msg, args=(client_socket, message))
             handle_thread.start()
 

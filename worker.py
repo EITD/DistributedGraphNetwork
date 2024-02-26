@@ -69,23 +69,26 @@ class Worker:
                     return None
                 
                 # TODO: 自己的节点别问了，问别人的
-                
-                if j < k - 1:
-                    request_data = {
-                        'feature_and_neighborhood' : {
-                            'nid' : node,
-                            'delta' : deltas[j + 1],
+                inMyself = []
+                if node % NUM_PARTITIONS == self.worker_id:
+                    inMyself.append(node)
+                else:
+                    if j < k - 1:
+                        request_data = {
+                            'feature_and_neighborhood' : {
+                                'nid' : node,
+                                'delta' : deltas[j + 1],
+                                'epoch' : self.epoch[nid]
+                            }
+                        }
+                    else:
+                        request_data = {
+                            'node_feature' : node,
                             'epoch' : self.epoch[nid]
                         }
-                    }
-                else:
-                    request_data = {
-                        'node_feature' : node,
-                        'epoch' : self.epoch[nid]
-                    }
-                request_json = json.dumps(request_data)
-                self.s.ask(threading.current_thread().name + node, node, request_json)
-                
+                    request_json = json.dumps(request_data)
+                    self.s.ask(threading.current_thread().name + node, node, request_json)
+
             okDict = {node:False for node in random_neighbors}
             node_neighbors_set = set()
             

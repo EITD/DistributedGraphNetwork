@@ -68,6 +68,8 @@ class Worker:
                 if node_epoch < self.epoch[nid]:
                     return None
                 
+                # TODO: 自己的节点别问了，问别人的
+                
                 if j < k - 1:
                     request_data = {
                         'feature_and_neighborhood' : {
@@ -108,7 +110,7 @@ class Worker:
         filter_nodes = self.filter_nodes(target_epoch)
         # while not all(value == target_epoch for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
         while filter_nodes:
-            random.shuffle(filter_nodes)
+            # random.shuffle(filter_nodes)
             for node in filter_nodes: 
                 # if self.epoch[node] < target_epoch:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -285,9 +287,10 @@ class Worker:
 
                 self.epoch[node] = epoch
 
-                request_data = {
-                    'update_epoch_ack' : "ok"
-                }
+                # request_data = {
+                #     'update_epoch_ack' : "ok"
+                # }
+                return
             
             request_json = json.dumps(request_data)
         except NodeForOtherWorker:

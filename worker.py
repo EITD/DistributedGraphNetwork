@@ -129,11 +129,11 @@ class Worker:
         while filter_nodes:
             # random.shuffle(filter_nodes)
             for node in filter_nodes: 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
                 # if self.epoch[node] < target_epoch:
-                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
-                # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
-                # update_node_epoch_thread.start()
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                        executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
+                    # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
+                    # update_node_epoch_thread.start()
                     
         # return self.graph_weight[target_epoch]
 
@@ -159,7 +159,7 @@ class Worker:
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
     def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
-        new_feature = self.khop_neighborhood(node, 1, [3])
+        new_feature = self.khop_neighborhood(node, 0, [0])
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]  
@@ -281,7 +281,7 @@ class Worker:
                 for server in list(self.s.serverDict.keys()):
                     self.s.ask(threading.current_thread().name + str(server), server, request_data)
                 
-                new_epoch = {}
+                # new_epoch = {}
                 okDict = {server:False for server in list(self.s.serverDict.keys())}
                 while not all(value for value in okDict.values()):
                     for server in list(self.s.serverDict.keys()):

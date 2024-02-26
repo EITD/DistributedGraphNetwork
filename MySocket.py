@@ -78,7 +78,7 @@ class MySocket:
             client_thread.start()
 
     def handle_client_connection(self, client_socket):
-        data = client_socket.recv(4096)
+        data = client_socket.recv(8192)
         print('get msg:', data)
         
         self.message_get_queue.put((client_socket, data.decode()))
@@ -89,11 +89,13 @@ class MySocket:
                 client_socket, message = self.message_send_queue.get()
                 print('send out:', message)
                 
-                send_thread = threading.Thread(target=self._send_message, args=(client_socket, message))
-                send_thread.start()
+                client_socket.send(message.encode())
+                
+                # send_thread = threading.Thread(target=self._send_message, args=(client_socket, message))
+                # send_thread.start()
 
-    def _send_message(self, client_socket, message):
-        client_socket.send(message.encode())
+    # def _send_message(self, client_socket, message):
+    #     client_socket.send(message.encode())
 
     # def print_message(self):
     #     while self.alive:
@@ -122,7 +124,7 @@ class MySocket:
                     start = time.time()
                     print(mid, 'start at:', time.localtime(start))
                 
-                data = client_socket.recv(4096).decode()
+                data = client_socket.recv(8192).decode()
                 if self.client:
                     end = time.time()
                     print(mid, 'end at:', time.localtime(end))

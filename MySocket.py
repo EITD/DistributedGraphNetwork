@@ -21,12 +21,21 @@ class ConnectionPool:
         self.connections.put(conn)
 
     def create_new_conn(self):
-        return socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        
+        sndbuf_size = 1024 * 1024 * 5  # 1MB
+        conn.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, sndbuf_size)
+
+        rcvbuf_size = 1024 * 1024 * 5 # 1MB
+        conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, rcvbuf_size)
+        return conn
+
 
 
 class MySocket:
     
-    conn_pool = ConnectionPool(60000)
+    conn_pool = ConnectionPool(10000)
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     message_get_queue = queue.Queue()
     message_send_queue = queue.Queue()
@@ -67,6 +76,13 @@ class MySocket:
         #     p = input("Enter other server port:")
         #     self.serverDict[int(n)] = (ip, int(p))
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        
+        sndbuf_size = 1024 * 1024 * 5 # 1MB
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, sndbuf_size)
+
+        rcvbuf_size = 1024 * 1024 * 5 # 1MB
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, rcvbuf_size)
         self.server_socket.bind((host, port))
         self.server_socket.listen(60000)
         
@@ -141,8 +157,6 @@ class MySocket:
                     client_socket.connect(self.serverDict.get(int(node) % self.NUM_PARTITIONS))
                 client_socket.send(b'__TELL__'+msg.encode())
                 print('tell:', msg)
-                
-                data = client_socket.recv(102400).decode()
                 
                 self.conn_pool.release_conn(client_socket)
                 break

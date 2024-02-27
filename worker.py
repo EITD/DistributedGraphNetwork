@@ -115,7 +115,7 @@ class Worker:
         filter_nodes = self.filter_nodes(target_epoch)
         while filter_nodes:
             for node in filter_nodes: 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+                with concurrent.futures.ThreadPoolExecutor() as executor:
                     executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
                 # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
                 # update_node_epoch_thread.start()

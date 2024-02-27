@@ -95,7 +95,7 @@ class MySocket:
             client_thread.start()
 
     def handle_client_connection(self, client_socket):
-        data = client_socket.recv(102400)
+        data = client_socket.recv(20480)
         print('get msg:', data)
         
         if b'!!TELL!!' not in data:
@@ -142,9 +142,13 @@ class MySocket:
                 print('tell:', msg)
                 self.conn_pool.release_conn(client_socket)
                 break
-            except (ConnectionRefusedError or BrokenPipeError):
+            except (ConnectionResetError or BrokenPipeError):
                 self.conn_pool.release_conn(client_socket)
                 break
+            except (ConnectionRefusedError):
+                print('error')
+                self.conn_pool.release_conn(client_socket)
+                continue
     
     def ask(self, mid, node, msg):
         ask_thread = threading.Thread(target=self._ask, args=(mid, node, msg))
@@ -164,15 +168,15 @@ class MySocket:
                     start = time.time()
                     print(mid, 'start at:', time.localtime(start))
                 
-                data = client_socket.recv(102400).decode()
+                data = client_socket.recv(20480).decode()
                 if self.client:
                     end = time.time()
                     print(mid, 'end at:', time.localtime(end))
                     duration = end - start
                     print(mid, 'duration:', duration)
-                if data != "":
+                else:
                     print('get reply:', data)
-                    self.ask_reply_dict[mid] = data
+                self.ask_reply_dict[mid] = data
 
                 self.conn_pool.release_conn(client_socket)
                 break

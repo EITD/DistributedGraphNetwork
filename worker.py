@@ -278,5 +278,5 @@ def start_worker(wid, portList):
             handle_thread.start()
 
 if __name__ == "__main__":
-        portList = [12345 + int(sys.argv[1]) + (i*4) for i in range(5000)]
+        portList = [12345 + int(sys.argv[1]) + (i*4) for i in range(3000)]
         start_worker(sys.argv[1], portList)

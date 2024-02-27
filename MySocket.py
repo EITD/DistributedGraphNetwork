@@ -27,8 +27,8 @@ class MySocket:
         
         testIp = host
         if not client:
-            self.serverDict = {0:[(testIp,12345 + (i*4)) for i in range(5000)], 1:[(testIp,12346 + (i*4)) for i in range(5000)], 
-                                2:[(testIp,12347 + (i*4)) for i in range(5000)], 3:[(testIp,12348 + (i*4)) for i in range(5000)]}
+            self.serverDict = {0:[(testIp,12345 + (i*4)) for i in range(3000)], 1:[(testIp,12346 + (i*4)) for i in range(3000)], 
+                                2:[(testIp,12347 + (i*4)) for i in range(3000)], 3:[(testIp,12348 + (i*4)) for i in range(3000)]}
             
         if client:
             self.serverDict = {-1:[(testIp,12346)]}
@@ -135,7 +135,7 @@ class MySocket:
                 if self.client:
                     client_socket.connect(self.serverDict[-1][0])
                 else:
-                    client_socket.connect(self.serverDict.get(int(node) % self.NUM_PARTITIONS)[random.randint(0, 4999)])
+                    client_socket.connect(self.serverDict.get(int(node) % self.NUM_PARTITIONS)[random.randint(0, 2999)])
                 client_socket.send(msg.encode())
                 print('ask:', msg)
                 if self.client:

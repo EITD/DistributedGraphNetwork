@@ -9,7 +9,7 @@ import sys
 import concurrent.futures
 from xmlrpc.server import SimpleXMLRPCServer
 import xmlrpc.client
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from socketserver import ThreadingMixIn
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 
@@ -76,9 +76,12 @@ class Worker:
                         sums += node_feature
                     else:
                         node_feature = self.node_feature(node, self.epoch[nid])
-                        print("self node feature: ", node_feature)
                         sums += node_feature
-                else:
+                    random_neighbors.remove(node)
+
+            with ThreadPoolExecutor(max_workers=len(random_neighbors)) as executor:
+                future_to_node = {}
+                for node in enumerate(random_neighbors):
                     if j < k - 1:
                         request_data = {
                             'feature_and_neighborhood' : {
@@ -92,14 +95,20 @@ class Worker:
                             'node_feature' : node,
                             'epoch' : self.epoch[nid]
                         }
-                    request_json = json.dumps(request_data)
-
-                    # TODO: multi-thread
-                    response = self.send_message(node, request_json)
-                    result = json.loads(response)
-                    if j < k - 1:
-                        node_neighbors_set.update(result['neighborhood'])
-                    sums += result['node_feature']
+                    future = executor.submit(self.send_message, node, json.dumps(request_data))
+                    future_to_node[future] = node
+                
+                for future in as_completed(future_to_node):
+                    node = future_to_node[future]
+                    try:
+                        response = future.result()
+                        result = json.loads(response)
+                        if j < k - 1:
+                            node_neighbors_set.update(result['neighborhood'])
+                        sums += result['node_feature']
+                    except Exception as exc:
+                        print(f"khop_neighborhood generated an exception: {exc}")
+                        # exc.with_traceback()
 
                     # self.s.ask(threading.current_thread().name + node, node, request_json)
 
@@ -148,7 +157,7 @@ class Worker:
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
     def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
-        new_feature = self.khop_neighborhood(node, 0, [0])
+        new_feature = self.khop_neighborhood(node, 2, [3, 3])
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
@@ -170,17 +179,22 @@ class Worker:
                 }
             }
             request_json = json.dumps(request_data)
-            for server in list(self.s.serverDict.keys()):
-                self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
 
-            okDict = {server:False for server in list(self.s.serverDict.keys())}
-            while not all(value for value in okDict.values()):
-                for server in list(self.s.serverDict.keys()):
-                    if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
-                        message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
-                        request_data = json.loads(message)
-                        if request_data['update_epoch_ack'] == "ok":
-                            okDict[server] = True
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                for server in range(4) and server != self.worker_id:
+                    executor.submit(self.send_message, server, request_json)
+            
+            # for server in list(self.s.serverDict.keys()):
+            #     self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
+
+            # okDict = {server:False for server in list(self.s.serverDict.keys())}
+            # while not all(value for value in okDict.values()):
+            #     for server in list(self.s.serverDict.keys()):
+            #         if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
+            #             message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
+            #             request_data = json.loads(message)
+            #             if request_data['update_epoch_ack'] == "ok":
+            #                 okDict[server] = True
 
     # def send_to_other(self, node, message):
     #      with ThreadPoolExecutor() as executor:
@@ -194,7 +208,8 @@ class Worker:
         proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
         print("Send message: ", message)
         response = proxy.handle_msg(message)
-        print("Received response message: ", message)
+        if response != "":
+            print("Received response message: ", response)
         return response
 
     def handle_msg(self, message):
@@ -259,19 +274,27 @@ class Worker:
             }
             request_json = json.dumps(request_data)
 
-            for server in list(self.s.serverDict.keys()):
-                self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
+            epoch_dict = {}
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                futures = {executor.submit(self.send_message, server, request_json): server for server in range(4)}
+                for future in as_completed(futures):
+                    try:
+                        response = future.result()
+                        request_data = json.loads(response)
+                        epoch_dict.update(request_data['graph_weight'])
+                    except Exception as exc:
+                        print(f"neighborhood_aggregation generated an exception: {exc}")
             
             # sum_graph = 0
-            epoch_dict = {}
-            okDict = {server:False for server in list(self.s.serverDict.keys())}
-            while not all(value for value in okDict.values()):
-                for server in list(self.s.serverDict.keys()):
-                    if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
-                        message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
-                        request_data = json.loads(message)
-                        epoch_dict.update(request_data['graph_weight'])
-                        okDict[server] = True
+            # epoch_dict = {}
+            # okDict = {server:False for server in list(self.s.serverDict.keys())}
+            # while not all(value for value in okDict.values()):
+            #     for server in list(self.s.serverDict.keys()):
+            #         if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
+            #             message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
+            #             request_data = json.loads(message)
+            #             epoch_dict.update(request_data['graph_weight'])
+            #             okDict[server] = True
 
             request_data = {
                 'epoch_dict' : epoch_dict
@@ -295,10 +318,10 @@ class Worker:
 
             self.epoch[node] = epoch
 
-            request_data = {
-                'update_epoch_ack' : "ok"
-            }
-            # return
+            # request_data = {
+            #     'update_epoch_ack' : "ok"
+            # }
+            return
         
         request_json = json.dumps(request_data)
         # except NodeForOtherWorker:

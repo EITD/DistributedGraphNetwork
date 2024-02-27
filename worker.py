@@ -25,7 +25,7 @@ class Worker:
 
     def __init__(self, wid, portList):
         self.worker_id = int(wid)
-        self.s = MySocket(myNode=wid, portList=portList, NUM_PARTITIONS=NUM_PARTITIONS)
+        self.s = MySocket(myNode=wid, port=portList, NUM_PARTITIONS=NUM_PARTITIONS)
 
     def load_node_data(self):
         with open(NODE_FEATURES, 'r') as file:
@@ -161,8 +161,7 @@ class Worker:
                         if request_data['update_epoch_ack'] == "ok":
                             okDict[server] = True
 
-    def handle_msg(self):
-        port, client_socket, message = self.s.message_get_queue.get()
+    def handle_msg(self, client_socket, message):
         request_data = json.loads(message)
         
         try:
@@ -265,7 +264,7 @@ class Worker:
                     request_json = self.s.ask_reply_dict.pop(threading.current_thread().name + nid)
                     break
         
-        self.s.message_send_queue_dict[port].put((client_socket, request_json))
+        self.s.message_send_queue.put((client_socket, request_json))
 
 
 def start_worker(wid, portList):
@@ -274,9 +273,10 @@ def start_worker(wid, portList):
     worker.load_graph_dict()
     while True:
         if not worker.s.message_get_queue.empty():
-            handle_thread = threading.Thread(target=worker.handle_msg)
+            client_socket, message = worker.s.message_get_queue.get()
+            handle_thread = threading.Thread(target=worker.handle_msg, args=(client_socket, message))
             handle_thread.start()
 
 if __name__ == "__main__":
-        portList = [12345 + int(sys.argv[1]) + (i*4) for i in range(5000)]
-        start_worker(sys.argv[1], portList)
+        # portList = [12345 + sys.argv[1] + (i*4) for i in range(1000)]
+        start_worker(sys.argv[1], 12345 + int(sys.argv[1]))

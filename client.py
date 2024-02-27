@@ -4,7 +4,7 @@ import json
 import sys
 from MySocket import MySocket
 
-s = MySocket(myNode=None, portList=[10000], NUM_PARTITIONS=4, client=True)
+s = MySocket(myNode=None, port=10000, NUM_PARTITIONS=4, client=True)
 
 def query_node_feature(nid):
     request_data = {

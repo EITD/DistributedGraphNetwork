@@ -46,7 +46,8 @@ class MySocket:
     alive = True
     
     def __init__(self, myNode, port, NUM_PARTITIONS = 4, client = False):
-        host = socket.gethostbyname(socket.gethostname())
+        # host = socket.gethostbyname(socket.gethostname())
+        host = 'localhost'
         print('host:', host)
         print('port:', port)
         self.NUM_PARTITIONS = NUM_PARTITIONS
@@ -84,7 +85,7 @@ class MySocket:
         rcvbuf_size = 1024 * 1024 * 5 # 1MB
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, rcvbuf_size)
         self.server_socket.bind((host, port))
-        self.server_socket.listen(60000)
+        self.server_socket.listen(10000)
         
         send_thread = threading.Thread(target=self.send_back)
         send_thread.start()

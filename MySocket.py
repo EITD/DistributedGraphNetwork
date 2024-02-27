@@ -146,10 +146,10 @@ class MySocket:
             except (ConnectionResetError or BrokenPipeError):
                 self.conn_pool.release_conn(client_socket)
                 break
-            except (ConnectionRefusedError):
-                print('error')
-                self.conn_pool.release_conn(client_socket)
-                continue
+            # except (ConnectionRefusedError):
+            #     print('error')
+            #     self.conn_pool.release_conn(client_socket)
+            #     continue
     
     def ask(self, mid, node, msg):
         ask_thread = threading.Thread(target=self._ask, args=(mid, node, msg))

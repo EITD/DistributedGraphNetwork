@@ -98,7 +98,10 @@ class MySocket:
         data = client_socket.recv(102400)
         print('get msg:', data)
         
-        self.message_get_queue.put((client_socket, data.decode()))
+        if b'!!TELL!!' not in data:
+            self.message_get_queue.put((client_socket, data.decode()))
+        else:
+            client_socket.close()
 
     def send_back(self):
         while self.alive:
@@ -122,6 +125,26 @@ class MySocket:
     #             print('    get msg:', message)
                 
     #             self.message_send_queue.put((client_socket, "get msg, send back res" + message))
+    
+    def tell(self, node, msg):
+        tell_thread = threading.Thread(target=self._tell, args=(node, msg))
+        tell_thread.start()
+    
+    def _tell(self, node, msg):
+        while self.alive:
+            client_socket = self.conn_pool.get_conn()
+            try:
+                if self.client:
+                    client_socket.connect(self.serverDict[-1])
+                else:
+                    client_socket.connect(self.serverDict.get(int(node) % self.NUM_PARTITIONS))
+                client_socket.send(msg.encode())
+                print('tell:', msg)
+                self.conn_pool.release_conn(client_socket)
+                break
+            except (ConnectionRefusedError or BrokenPipeError):
+                self.conn_pool.release_conn(client_socket)
+                break
     
     def ask(self, mid, node, msg):
         ask_thread = threading.Thread(target=self._ask, args=(mid, node, msg))

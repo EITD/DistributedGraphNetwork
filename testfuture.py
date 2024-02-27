@@ -8,7 +8,11 @@ class YourClass:
     def send_message(self, node, request_json):
         # 这里是发送消息的逻辑，并模拟返回一些JSON数据
         # 注意：根据实际情况调整此处逻辑
-        return '{"neighborhood": ["node1", "node2"], "node_feature": 1}'
+        request_data = {
+                'node_feature' : 1, # feature
+                'neighborhood' : ["1", "2"] # [nid, nid, nid...]
+            }
+        return json.dumps(request_data)
 
 def main():
     your_class = YourClass()

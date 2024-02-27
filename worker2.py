@@ -81,7 +81,7 @@ class Worker:
 
             with ThreadPoolExecutor(max_workers=len(random_neighbors)) as executor:
                 future_to_node = {}
-                for node in enumerate(random_neighbors):
+                for node in random_neighbors:
                     if j < k - 1:
                         request_data = {
                             'feature_and_neighborhood' : {

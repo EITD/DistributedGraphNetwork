@@ -42,7 +42,8 @@ def aggregate_neighborhood(nid, epochs):
         }
     }
     request_json = json.dumps(request_data)
-    s.ask(0, node=nid, msg=request_json)
+    threading.Thread(target=send_message, args=(request_json,)).start()
+    # s.ask(0, node=nid, msg=request_json)
 
 
 # query_node_feature(0)
@@ -51,9 +52,9 @@ def aggregate_neighborhood(nid, epochs):
 
 # query_khop_neighborhood(1, 1, 5)
 
-query_khop_neighborhood(3, 3, [2, 18, 32])
+# query_khop_neighborhood(3, 3, [2, 18, 32])
 
-# aggregate_neighborhood(0, 1)
+aggregate_neighborhood(0, 1)
 
 # while True:
 #     if 0 in s.ask_reply_dict:

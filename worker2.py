@@ -79,7 +79,7 @@ class Worker:
                         sums += node_feature
                     random_neighbors.remove(node)
 
-            with ThreadPoolExecutor(max_workers=len(random_neighbors)) as executor:
+            with ThreadPoolExecutor() as executor:
                 future_to_node = {}
                 for node in random_neighbors:
                     if j < k - 1:
@@ -180,7 +180,7 @@ class Worker:
             }
             request_json = json.dumps(request_data)
 
-            with ThreadPoolExecutor(max_workers=4) as executor:
+            with ThreadPoolExecutor() as executor:
                 for server in range(4) and server != self.worker_id:
                     executor.submit(self.send_message, server, request_json)
             
@@ -212,6 +212,7 @@ class Worker:
             print("Received response message: ", response)
         return response
 
+# TODO: improve: rpc call different methods
     def handle_msg(self, message):
         # port, client_socket, message = self.s.message_get_queue.get()
         print("Received handle message: ", message)
@@ -275,7 +276,7 @@ class Worker:
             request_json = json.dumps(request_data)
 
             epoch_dict = {}
-            with ThreadPoolExecutor(max_workers=4) as executor:
+            with ThreadPoolExecutor() as executor:
                 futures = {executor.submit(self.send_message, server, request_json): server for server in range(4)}
                 for future in as_completed(futures):
                     try:

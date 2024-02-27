@@ -26,7 +26,7 @@ class ConnectionPool:
 
 class MySocket:
     
-    conn_pool = ConnectionPool(5000)
+    conn_pool = ConnectionPool(60000)
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     message_get_queue = queue.Queue()
     message_send_queue = queue.Queue()
@@ -68,7 +68,7 @@ class MySocket:
         #     self.serverDict[int(n)] = (ip, int(p))
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((host, port))
-        self.server_socket.listen(1000)
+        self.server_socket.listen(60000)
         
         send_thread = threading.Thread(target=self.send_back)
         send_thread.start()
@@ -98,11 +98,11 @@ class MySocket:
         data = client_socket.recv(20480)
         print('get msg:', data)
         
-        if b'!!TELL!!' not in data:
-            self.message_get_queue.put((client_socket, data.replace(b'!!TELL!!', b'', 1).decode()))
-        else:
+        if b'__TELL__' not in data:
             self.message_get_queue.put((client_socket, data.decode()))
-            client_socket.close()
+        else:
+            self.message_get_queue.put((client_socket, data.replace(b'__TELL__', b'', 1).decode()))
+            client_socket.send('ok'.encode())
 
     def send_back(self):
         while self.alive:
@@ -139,17 +139,17 @@ class MySocket:
                     client_socket.connect(self.serverDict[-1])
                 else:
                     client_socket.connect(self.serverDict.get(int(node) % self.NUM_PARTITIONS))
-                client_socket.send(msg.encode())
+                client_socket.send(b'__TELL__'+msg.encode())
                 print('tell:', msg)
+                
+                data = client_socket.recv(102400).decode()
+                
                 self.conn_pool.release_conn(client_socket)
                 break
-            except (ConnectionResetError or BrokenPipeError):
+            except (ConnectionRefusedError):
+                print('tell error')
                 self.conn_pool.release_conn(client_socket)
-                break
-            # except (ConnectionRefusedError):
-            #     print('error')
-            #     self.conn_pool.release_conn(client_socket)
-            #     continue
+                continue
     
     def ask(self, mid, node, msg):
         ask_thread = threading.Thread(target=self._ask, args=(mid, node, msg))
@@ -169,7 +169,7 @@ class MySocket:
                     start = time.time()
                     print(mid, 'start at:', time.localtime(start))
                 
-                data = client_socket.recv(20480).decode()
+                data = client_socket.recv(102400).decode()
                 if self.client:
                     end = time.time()
                     print(mid, 'end at:', time.localtime(end))
@@ -182,7 +182,7 @@ class MySocket:
                 self.conn_pool.release_conn(client_socket)
                 break
             except (ConnectionRefusedError):
-                print('error')
+                print('ask error')
                 self.conn_pool.release_conn(client_socket)
                 continue
             # except (BrokenPipeError):

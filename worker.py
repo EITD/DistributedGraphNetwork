@@ -115,7 +115,7 @@ class Worker:
         filter_nodes = self.filter_nodes(target_epoch)
         while filter_nodes:
             for node in filter_nodes: 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1000) as executor:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
                     executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
                 # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
                 # update_node_epoch_thread.start()
@@ -161,7 +161,8 @@ class Worker:
             #             if request_data['update_epoch_ack'] == "ok":
             #                 okDict[server] = True
 
-    def handle_msg(self, client_socket, message):
+    def handle_msg(self):
+        client_socket, message = self.s.message_get_queue.get()
         request_data = json.loads(message)
         
         try:
@@ -273,8 +274,7 @@ def start_worker(wid, portList):
     worker.load_graph_dict()
     while True:
         if not worker.s.message_get_queue.empty():
-            client_socket, message = worker.s.message_get_queue.get()
-            handle_thread = threading.Thread(target=worker.handle_msg, args=(client_socket, message))
+            handle_thread = threading.Thread(target=worker.handle_msg)
             handle_thread.start()
 
 if __name__ == "__main__":

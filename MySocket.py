@@ -99,8 +99,9 @@ class MySocket:
         print('get msg:', data)
         
         if b'!!TELL!!' not in data:
-            self.message_get_queue.put((client_socket, data.decode()))
+            self.message_get_queue.put((client_socket, data.replace(b'!!TELL!!', b'', 1).decode()))
         else:
+            self.message_get_queue.put((client_socket, data.decode()))
             client_socket.close()
 
     def send_back(self):

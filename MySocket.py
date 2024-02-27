@@ -26,7 +26,7 @@ class ConnectionPool:
 
 class MySocket:
     
-    conn_pool = ConnectionPool(2000)
+    conn_pool = ConnectionPool(5000)
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     message_get_queue = queue.Queue()
     message_send_queue = queue.Queue()

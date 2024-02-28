@@ -2,14 +2,10 @@ import random
 from ConvertFile import ConvertFile
 import networkx as nx
 
-request_data = {
-        'khop_ask_phase': {
-                'nid': '1',
-                'k': 2,
-                'deltas': [1,2,3]
-                }
-        }
+node_data = {0:{0:0}, 1:{1:1}}
 
-print(type(request_data['khop_ask_phase']['deltas']))
+history = node_data.get(307, {})
+print({}.get(0, 0))
+
 # for i in random_neighbors:
 #     print(i, type(i))

@@ -14,7 +14,7 @@ from socketserver import ThreadingMixIn
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 
 NUM_PARTITIONS = 4
-NODE_FEATURES = "./data/node_features.txt"
+NODE_FEATURES = "./data/node_features_dummy.txt"
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -47,21 +47,26 @@ class Worker:
         
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
-        return history.get(epoch, 0)
+        temp = history.get(epoch, 2 ** epoch)
+        return temp
         
     def feature_and_neighborhood(self, nid, delta, epoch):
-        node_neighbors_list = list(self.graph.neighbors(nid))
+        node_neighbors_list = list()
+        if nid in self.node_data.keys():
+            node_neighbors_list = list(self.graph.neighbors(nid))
         random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
         
         return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
-        sums = self.node_feature(nid, self.epoch[nid])
-        node_neighbors_set = set(self.graph.neighbors(nid))
+        sums = self.node_feature(nid, self.epoch.get(nid, 0))
+        node_neighbors_set = set()
+        if nid in self.node_data.keys():
+            node_neighbors_set = set(self.graph.neighbors(nid))
         
         for j in range(k): # [2,3,2]
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
-            
+
             # inMyself = []
             for node in random_neighbors:
                 node_epoch = self.epoch.get(node, self.epoch[nid])
@@ -71,11 +76,11 @@ class Worker:
                 if (int(node) % NUM_PARTITIONS) == self.worker_id:
                     # inMyself.append(node)
                     if j < k - 1:
-                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch[nid])
+                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch.get(nid, 0))
                         node_neighbors_set.update(neighborhood)
                         sums += node_feature
                     else:
-                        node_feature = self.node_feature(node, self.epoch[nid])
+                        node_feature = self.node_feature(node, self.epoch.get(nid, 0))
                         sums += node_feature
                     random_neighbors.remove(node)
 
@@ -87,13 +92,13 @@ class Worker:
                             'feature_and_neighborhood' : {
                                 'nid' : node,
                                 'delta' : deltas[j + 1],
-                                'epoch' : self.epoch[nid]
+                                'epoch' : self.epoch.get(nid, 0)
                             }
                         }
                     else:
                         request_data = {
                             'node_feature' : node,
-                            'epoch' : self.epoch[nid]
+                            'epoch' : self.epoch.get(nid, 0)
                         }
                     future = executor.submit(self.send_message, node, json.dumps(request_data))
                     future_to_node[future] = node
@@ -144,8 +149,8 @@ class Worker:
     def aggregate_neighborhood(self, target_epoch):
         filter_nodes = self.filter_nodes(target_epoch)
         while filter_nodes:
-            for node in filter_nodes: 
-                with concurrent.futures.ThreadPoolExecutor() as executor:
+            with ThreadPoolExecutor() as executor:
+                for node in filter_nodes: 
                     executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
                 # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
                 # update_node_epoch_thread.start()
@@ -157,7 +162,7 @@ class Worker:
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
     def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
-        new_feature = self.khop_neighborhood(node, 2, [3, 3])
+        new_feature = self.khop_neighborhood(node, 1, [1])
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
@@ -171,7 +176,7 @@ class Worker:
             self.epoch[node] += 1
             if self.epoch[node] >= target_epoch:
                 filter_nodes.remove(node)
-            
+
             request_data = {
                 'update_node_epoch': {
                     'nid': node,
@@ -299,7 +304,7 @@ class Worker:
 
             request_data = {
                 'epoch_dict' : epoch_dict
-            }     
+            }
                     
         elif 'graph_weight' in request_data:
             target_epoch = request_data['graph_weight']['target_epoch']

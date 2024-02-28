@@ -44,12 +44,20 @@ def aggregate_neighborhood(nid, epochs):
 
 # query_khop_neighborhood(3, 3, [2, 18, 32])
 
-aggregate_neighborhood(0, 2)
+aggregate_neighborhood(0, 4)
+
+epoch = 4
 
 while True:
     if 0 in s.ask_reply_dict:
         a = s.ask_reply_dict[0]
 
+        dic = json.loads(a)['epoch_dict']
+
+        for key, value in dic.items():
+                if (2 ** epoch != value):
+                        print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
+        
         with open('check', 'w') as f:
             f.write(str(json.loads(a)['epoch_dict']))
         break

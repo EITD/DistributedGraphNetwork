@@ -119,7 +119,9 @@ class MySocket:
             self.message_get_queue.put((client_socket, data.decode()))
         else:
             self.message_get_queue.put((client_socket, data.replace(b'__TELL__', b'', 1).decode()))
-            client_socket.send('ok'.encode())
+            # client_socket.send('ok'.encode())
+            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.close()
 
     def send_back(self):
         while self.alive:
@@ -150,7 +152,8 @@ class MySocket:
     
     def _tell(self, node, msg):
         while self.alive:
-            client_socket = self.conn_pool.get_conn()
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:
                 if self.client:
                     client_socket.connect(self.serverDict[-1])
@@ -159,11 +162,13 @@ class MySocket:
                 client_socket.send(b'__TELL__'+msg.encode())
                 print('tell:', msg)
                 
-                self.conn_pool.release_conn(client_socket)
+                client_socket.shutdown(socket.SHUT_RDWR)
+                client_socket.close()
                 break
             except (ConnectionRefusedError):
                 print('tell error')
-                self.conn_pool.release_conn(client_socket)
+                client_socket.shutdown(socket.SHUT_RDWR)
+                client_socket.close()
                 continue
     
     def ask(self, mid, node, msg):
@@ -195,10 +200,14 @@ class MySocket:
                 self.ask_reply_dict[mid] = data
 
                 self.conn_pool.release_conn(client_socket)
+                # client_socket.shutdown(socket.SHUT_RDWR)
+                # client_socket.close()
                 break
             except (ConnectionRefusedError):
                 print('ask error')
                 self.conn_pool.release_conn(client_socket)
+                # client_socket.shutdown(socket.SHUT_RDWR)
+                # client_socket.close()
                 continue
             # except (BrokenPipeError):
             #     print('break')

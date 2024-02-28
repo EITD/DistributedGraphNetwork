@@ -9,7 +9,7 @@ import sys
 import concurrent.futures
 
 NUM_PARTITIONS = 4
-NODE_FEATURES = "./data/node_features.txt"
+NODE_FEATURES = "./data/node_features_dummy.txt"
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -42,17 +42,21 @@ class Worker:
         
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
-        return history.get(epoch, 0)
+        return history.get(epoch, 2 ** epoch)
         
     def feature_and_neighborhood(self, nid, delta, epoch):
-        node_neighbors_list = list(self.graph.neighbors(nid))
+        node_neighbors_list = list()
+        if nid in self.node_data.keys():
+            node_neighbors_list = list(self.graph.neighbors(nid))
         random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
         
         return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
         sums = self.node_feature(nid, self.epoch[nid])
-        node_neighbors_set = set(self.graph.neighbors(nid))
+        node_neighbors_set = set()
+        if nid in self.node_data.keys():
+            node_neighbors_set = set(self.graph.neighbors(nid))
         
         for j in range(k): # [2,3,2]
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
@@ -127,7 +131,7 @@ class Worker:
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
     def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
-        new_feature = self.khop_neighborhood(node, 0, [0])
+        new_feature = self.khop_neighborhood(node, 1, [1])
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]

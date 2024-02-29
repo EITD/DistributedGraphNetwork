@@ -2,6 +2,7 @@ import random
 import socket
 from multiprocessing import Process
 import threading
+import time
 from ConvertFile import ConvertFile, nx
 import json
 from MySocket import MySocket
@@ -47,7 +48,7 @@ class Worker:
         
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
-        temp = history.get(epoch, 2 ** epoch)
+        temp = history.get(epoch, 1)
         return temp
         
     def feature_and_neighborhood(self, nid, delta, epoch):
@@ -151,6 +152,7 @@ class Worker:
         while filter_nodes:
             with ThreadPoolExecutor() as executor:
                 for node in filter_nodes: 
+                    filter_nodes.remove(node)
                     executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
                 # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
                 # update_node_epoch_thread.start()
@@ -162,7 +164,7 @@ class Worker:
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
     def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
-        new_feature = self.khop_neighborhood(node, 1, [1])
+        new_feature = self.khop_neighborhood(node, 1, [5000])
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
@@ -174,8 +176,8 @@ class Worker:
             #     self.graph_weight[my_epoch + 1] = new_feature
 
             self.epoch[node] += 1
-            if self.epoch[node] >= target_epoch:
-                filter_nodes.remove(node)
+            if self.epoch[node] < target_epoch:
+                filter_nodes.append(node)
 
             request_data = {
                 'update_node_epoch': {
@@ -209,13 +211,16 @@ class Worker:
     #         return response
 
     def send_message(self, node, message):
-        port = 12345 + int(node) % NUM_PARTITIONS
-        proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
         print("Send message: ", message)
-        response = proxy.handle_msg(message)
-        if response != "":
-            print("Received response message: ", response)
-        return response
+        try:
+            port = 12345 + int(node) % NUM_PARTITIONS
+            proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
+            response = proxy.handle_msg(message)
+            if response != "":
+                print("Received response message: ", response)
+            return response
+        except Exception as e:
+            print("!!!!!!RPC exception!!!!!!")
 
 # TODO: improve: rpc call different methods
     def handle_msg(self, message):

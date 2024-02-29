@@ -57,6 +57,7 @@ class Worker:
         
         for j in range(k): 
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
+            node_neighbors_set = set()
 
             for node in random_neighbors:
                 node_epoch = self.epoch.get(node, self.epoch[nid])

@@ -16,10 +16,10 @@ def send_message(message):
         end_time = time.time()
         print("time: ", end_time - start_time)
 
-        # aggregate_neighborhood test
+        # train test
         # test(response)
 
-
+# TODO: refactor test code
 def test(response):
     # when node feature all 1(load dummmy), default is 2 ** epoch, multiple epochs, k = 1, deltas = [1]
     # epoch = 6
@@ -101,12 +101,14 @@ def train_asynchronize(epochs, k, deltas):
 
 # query_node_feature(1)
 
-# query_khop_neighborhood(1683, 2, [5000, 5000**2])
+# query_khop_neighborhood(4031, 2, [5000, 5000**2])
 
 # query_khop_neighborhood(3, 3, [2, 18, 32])
     
 # query_khop_neighborhood(0, 1, 5000)
 
-train_synchronize(2, 1, 5000)
+# train_synchronize(2, 1, 5000)
 
 # train_asynchronize(2, 1, 5000)
+    
+train_asynchronize(1, 2, [5000, 5000**2])

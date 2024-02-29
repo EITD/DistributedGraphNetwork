@@ -1,4 +1,7 @@
+# This version tried lock for dict, which is not the true reason for inaccurate node features 
+
 import random
+import threading
 from ConvertFile import ConvertFile
 import json
 import sys
@@ -8,20 +11,39 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from socketserver import ThreadingMixIn
 
 NUM_PARTITIONS = 4
-# dummy file for test
 NODE_FEATURES = "./data/node_features_dummy.txt"
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
         pass
+
 class Worker:
     worker_id = None
     node_data = {}
     graph = {}
     epoch = {}
+    
+    node_data_lock = threading.Lock()
+    epoch_lock = threading.Lock()
 
     def __init__(self, wid):
         self.worker_id = int(wid)
+        
+    def write_node_data(self, key, value):
+        with self.node_data_lock:
+            self.node_data[key] = value
+
+    def read_node_data(self, key):
+        with self.node_data_lock:
+            return self.node_data.get(key, {})
+    
+    def write_epoch(self, key, value):
+        with self.epoch_lock:
+            self.epoch[key] = value
+
+    def read_epoch(self, key, defalut=0):
+        with self.epoch_lock:
+            return self.epoch.get(key, defalut)
 
     def load_node_data(self):
         with open(NODE_FEATURES, 'r') as file:
@@ -36,9 +58,9 @@ class Worker:
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         
     def node_feature(self, nid, epoch):
-        history = self.node_data.get(nid, {})
-        # node without feature default value
-        return history.get(epoch, 1)
+        history = self.read_node_data(nid)
+        temp = history.get(epoch, 1)
+        return temp
         
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
@@ -49,7 +71,7 @@ class Worker:
         return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
-        sums = self.node_feature(nid, self.epoch.get(nid, 0))
+        sums = self.node_feature(nid, self.read_epoch(nid))
         node_neighbors_set = set()
         if nid in self.node_data.keys():
             node_neighbors_set = set(self.graph.neighbors(nid))
@@ -58,17 +80,17 @@ class Worker:
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
 
             for node in random_neighbors:
-                node_epoch = self.epoch.get(node, self.epoch[nid])
-                if node_epoch < self.epoch[nid]:
+                node_epoch = self.read_epoch(node, float('inf'))
+                if node_epoch < self.read_epoch(nid):
                     return None
                 
                 if (int(node) % NUM_PARTITIONS) == self.worker_id:
                     if j < k - 1:
-                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch.get(nid, 0))
+                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.read_epoch(nid))
                         node_neighbors_set.update(neighborhood)
                         sums += node_feature
                     else:
-                        node_feature = self.node_feature(node, self.epoch.get(nid, 0))
+                        node_feature = self.node_feature(node, self.read_epoch(nid))
                         sums += node_feature
                     random_neighbors.remove(node)
 
@@ -80,13 +102,13 @@ class Worker:
                             'feature_and_neighborhood' : {
                                 'nid' : node,
                                 'delta' : deltas[j + 1],
-                                'epoch' : self.epoch.get(nid, 0)
+                                'epoch' : self.read_epoch(nid)
                             }
                         }
                     else:
                         request_data = {
                             'node_feature' : node,
-                            'epoch' : self.epoch.get(nid, 0)
+                            'epoch' : self.read_epoch(nid)
                         }
                     future = executor.submit(self.send_message, node, json.dumps(request_data))
                     future_to_node[future] = node
@@ -110,7 +132,6 @@ class Worker:
             with ThreadPoolExecutor() as executor:
                 for node in filter_nodes: 
                     filter_nodes.remove(node)
-                    # synchronous add future
                     executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
                     
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
@@ -120,21 +141,21 @@ class Worker:
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
     def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
-        # customize khop parameter
         new_feature = self.khop_neighborhood(node, 1, [5000])
         if new_feature is not None:
-            history = self.node_data.get(node, {})
+            history = self.read_node_data(node)
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
             history[my_epoch + 1] = new_feature
 
-            self.epoch[node] += 1
-            if self.epoch[node] < target_epoch:
+            temp = self.read_epoch(node)
+            if (temp + 1) < target_epoch:
                 filter_nodes.append(node)
+            self.write_epoch(node, temp + 1)
 
             request_data = {
                 'update_node_epoch': {
                     'nid': node,
-                    'epoch': self.epoch[node]
+                    'epoch': temp + 1
                 }
             }
             request_json = json.dumps(request_data)
@@ -142,8 +163,7 @@ class Worker:
             with ThreadPoolExecutor() as executor:
                 for server in range(4) and server != self.worker_id:
                     executor.submit(self.send_message, server, request_json)
-    
-    # simple rpc server, start thread in each request but not work
+            
     # def send_to_other(self, node, message):
     #      with ThreadPoolExecutor() as executor:
     #         future = executor.submit(self.send_message, node, message)
@@ -153,17 +173,15 @@ class Worker:
 
     def send_message(self, node, message):
         print("Send message: ", message)
-        while True:
-            try:
-                port = 12345 + int(node) % NUM_PARTITIONS
-                proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
-                response = proxy.handle_msg(message)
-                if response != "":
-                    print("Received response message: ", response)
-                return response
-            except Exception as e:
-                # print("!!!!!!RPC exception!!!!!!")
-                continue
+        try:
+            port = 12345 + int(node) % NUM_PARTITIONS
+            proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
+            response = proxy.handle_msg(message)
+            if response != "":
+                print("Received response message: ", response)
+            return response
+        except Exception as e:
+            print("!!!!!!RPC exception!!!!!!")
 
 # TODO: improve: rpc call different methods
     def handle_msg(self, message):
@@ -172,7 +190,8 @@ class Worker:
         
         if 'node_feature' in request_data:
             nid = request_data['node_feature']
-            epoch = int(request_data.get('epoch', self.epoch.get(nid, 0)))
+            epoch = int(request_data.get('epoch', self.read_epoch(nid)))
+            
 
             if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                 response = self.send_message(nid, message)
@@ -253,14 +272,14 @@ class Worker:
             node = request_data['update_node_epoch']['nid']
             epoch = request_data['update_node_epoch']['epoch']
 
-            self.epoch[node] = epoch
+            self.write_epoch(node, epoch)
 
             return
         
         request_json = json.dumps(request_data)
         
         return request_json
-    
+
 class ThreadedXMLRPCServer(ThreadingMixIn, SimpleXMLRPCServer):
     pass
 

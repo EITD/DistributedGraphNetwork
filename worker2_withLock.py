@@ -20,6 +20,7 @@ NODE_FEATURES = "./data/node_features_dummy.txt"
 class NodeForOtherWorker(Exception):
     def __init__(self):
         pass
+
 class Worker:
     worker_id = None
     # s = None
@@ -28,10 +29,29 @@ class Worker:
     # acc = 0
     epoch = {}
     # graph_weight = {0:0}
+    
+    node_data_lock = threading.Lock()
+    epoch_lock = threading.Lock()
 
     def __init__(self, wid):
         self.worker_id = int(wid)
         # self.s = MySocket(myNode=wid, portList=portList, NUM_PARTITIONS=NUM_PARTITIONS)
+        
+    def write_node_data(self, key, value):
+        with self.node_data_lock:
+            self.node_data[key] = value
+
+    def read_node_data(self, key):
+        with self.node_data_lock:
+            return self.node_data.get(key, {})
+    
+    def write_epoch(self, key, value):
+        with self.epoch_lock:
+            self.epoch[key] = value
+
+    def read_epoch(self, key, defalut=0):
+        with self.epoch_lock:
+            return self.epoch.get(key, defalut)
 
     def load_node_data(self):
         with open(NODE_FEATURES, 'r') as file:
@@ -47,7 +67,8 @@ class Worker:
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         
     def node_feature(self, nid, epoch):
-        history = self.node_data.get(nid, {})
+        # history = self.node_data.get(nid, {})
+        history = self.read_node_data(nid)
         temp = history.get(epoch, 1)
         return temp
         
@@ -60,7 +81,7 @@ class Worker:
         return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
-        sums = self.node_feature(nid, self.epoch.get(nid, 0))
+        sums = self.node_feature(nid, self.read_epoch(nid))
         node_neighbors_set = set()
         if nid in self.node_data.keys():
             node_neighbors_set = set(self.graph.neighbors(nid))
@@ -70,18 +91,18 @@ class Worker:
 
             # inMyself = []
             for node in random_neighbors:
-                node_epoch = self.epoch.get(node, self.epoch[nid])
-                if node_epoch < self.epoch[nid]:
+                node_epoch = self.read_epoch(node, float('inf'))
+                if node_epoch < self.read_epoch(nid):
                     return None
                 
                 if (int(node) % NUM_PARTITIONS) == self.worker_id:
                     # inMyself.append(node)
                     if j < k - 1:
-                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch.get(nid, 0))
+                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.read_epoch(nid))
                         node_neighbors_set.update(neighborhood)
                         sums += node_feature
                     else:
-                        node_feature = self.node_feature(node, self.epoch.get(nid, 0))
+                        node_feature = self.node_feature(node, self.read_epoch(nid))
                         sums += node_feature
                     random_neighbors.remove(node)
 
@@ -93,13 +114,13 @@ class Worker:
                             'feature_and_neighborhood' : {
                                 'nid' : node,
                                 'delta' : deltas[j + 1],
-                                'epoch' : self.epoch.get(nid, 0)
+                                'epoch' : self.read_epoch(nid)
                             }
                         }
                     else:
                         request_data = {
                             'node_feature' : node,
-                            'epoch' : self.epoch.get(nid, 0)
+                            'epoch' : self.read_epoch(nid)
                         }
                     future = executor.submit(self.send_message, node, json.dumps(request_data))
                     future_to_node[future] = node
@@ -166,7 +187,8 @@ class Worker:
     def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
         new_feature = self.khop_neighborhood(node, 1, [5000])
         if new_feature is not None:
-            history = self.node_data.get(node, {})
+            # history = self.node_data.get(node, {})
+            history = self.read_node_data(node)
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
             history[my_epoch + 1] = new_feature
 
@@ -175,14 +197,15 @@ class Worker:
             # else:
             #     self.graph_weight[my_epoch + 1] = new_feature
 
-            self.epoch[node] += 1
-            if self.epoch[node] < target_epoch:
+            temp = self.read_epoch(node)
+            if (temp + 1) < target_epoch:
                 filter_nodes.append(node)
+            self.write_epoch(node, temp + 1)
 
             request_data = {
                 'update_node_epoch': {
                     'nid': node,
-                    'epoch': self.epoch[node]
+                    'epoch': temp + 1
                 }
             }
             request_json = json.dumps(request_data)
@@ -231,7 +254,7 @@ class Worker:
         # try:
         if 'node_feature' in request_data:
             nid = request_data['node_feature']
-            epoch = int(request_data.get('epoch', self.epoch.get(nid, 0)))
+            epoch = int(request_data.get('epoch', self.read_epoch(nid)))
             
 
             if (int(nid) % NUM_PARTITIONS) != self.worker_id:
@@ -327,7 +350,7 @@ class Worker:
             node = request_data['update_node_epoch']['nid']
             epoch = request_data['update_node_epoch']['epoch']
 
-            self.epoch[node] = epoch
+            self.write_epoch(node, epoch)
 
             # request_data = {
             #     'update_epoch_ack' : "ok"

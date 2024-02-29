@@ -1,3 +1,5 @@
+# This version is changed from socket version, reserve all comments
+
 import random
 import socket
 from multiprocessing import Process
@@ -5,7 +7,6 @@ import threading
 import time
 from ConvertFile import ConvertFile, nx
 import json
-from MySocket import MySocket
 import sys
 import concurrent.futures
 from xmlrpc.server import SimpleXMLRPCServer

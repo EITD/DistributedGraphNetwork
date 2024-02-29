@@ -4,12 +4,14 @@ import json
 import sys
 from xmlrpc.server import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 import xmlrpc.client
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 from socketserver import ThreadingMixIn
 
 NUM_PARTITIONS = 4
 # dummy file for test
-NODE_FEATURES = "./data/node_features_dummy.txt"
+NODE_FEATURES = "./data/node_features.txt"
+# node without feature default value
+NODE_DEFAULT_FEATURE = 0
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -37,8 +39,7 @@ class Worker:
         
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
-        # node without feature default value
-        return history.get(epoch, 1)
+        return history.get(epoch, NODE_DEFAULT_FEATURE)
         
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
@@ -104,14 +105,23 @@ class Worker:
         
         return sums
     
-    def aggregate_neighborhood(self, target_epoch):
+    def aggregate_neighborhood(self, target_epoch, k, deltas, sync):
         filter_nodes = self.filter_nodes(target_epoch)
-        while filter_nodes:
-            with ThreadPoolExecutor() as executor:
-                for node in filter_nodes: 
-                    filter_nodes.remove(node)
-                    # synchronous add future
-                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
+        if sync:
+            while filter_nodes:
+                futures = []
+                with ThreadPoolExecutor() as executor:
+                    for node in filter_nodes: 
+                        filter_nodes.remove(node)
+                        future = executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, k, deltas, filter_nodes)
+                        futures.append(future)
+                wait(futures)
+        else:    
+            while filter_nodes:
+                with ThreadPoolExecutor() as executor:
+                    for node in filter_nodes: 
+                        filter_nodes.remove(node)
+                        executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, k, deltas, filter_nodes)
                     
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     
@@ -119,9 +129,9 @@ class Worker:
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
-    def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
+    def update_node_epoch_and_wait_for_ack(self, node, target_epoch, k, deltas, filter_nodes):
         # customize khop parameter
-        new_feature = self.khop_neighborhood(node, 1, [5000])
+        new_feature = self.khop_neighborhood(node, k, deltas)
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
@@ -214,10 +224,16 @@ class Worker:
         
         elif 'neighborhood_aggregation' in request_data:
             final_epoch = request_data['neighborhood_aggregation']['epochs']
+            k = request_data['neighborhood_aggregation']['k']
+            deltas = request_data['neighborhood_aggregation']['deltas']
+            sync = request_data['neighborhood_aggregation']['sync']
                 
             request_data = {
                 'graph_weight': {
-                    'target_epoch': final_epoch
+                    'target_epoch': final_epoch,
+                    'k': k,
+                    'deltas': deltas,
+                    'sync': sync
                 }
             }
             request_json = json.dumps(request_data)
@@ -239,6 +255,9 @@ class Worker:
                     
         elif 'graph_weight' in request_data:
             target_epoch = request_data['graph_weight']['target_epoch']
+            k = request_data['graph_weight']['k']
+            deltas = request_data['graph_weight']['deltas']
+            sync = request_data['graph_weight']['sync']
 
             if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
                 request_data = {
@@ -246,7 +265,7 @@ class Worker:
                 } 
             else:
                 request_data = {
-                    'graph_weight' : self.aggregate_neighborhood(target_epoch)
+                    'graph_weight' : self.aggregate_neighborhood(target_epoch, k, deltas, sync)
                 }
         
         elif 'update_node_epoch' in request_data:

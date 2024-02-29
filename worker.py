@@ -117,9 +117,10 @@ class Worker:
     
     def aggregate_neighborhood(self, target_epoch):
         filter_nodes = self.filter_nodes(target_epoch)
-        while filter_nodes:
-            for node in filter_nodes: 
-                with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2000) as executor:
+            while filter_nodes:
+                for node in filter_nodes: 
+                    filter_nodes.remove(node)
                     executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
                 # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
                 # update_node_epoch_thread.start()
@@ -143,8 +144,8 @@ class Worker:
             #     self.graph_weight[my_epoch + 1] = new_feature
 
             self.epoch[node] += 1
-            if self.epoch[node] >= target_epoch:
-                filter_nodes.remove(node)
+            if self.epoch[node] < target_epoch:
+                filter_nodes.append(node)
             
             request_data = {
                 'update_node_epoch': {

@@ -110,19 +110,21 @@ class Worker:
         filter_nodes = self.filter_nodes(target_epoch)
         if sync:
             while filter_nodes:
-                futures = []
-                with ThreadPoolExecutor() as executor:
-                    for node in filter_nodes: 
-                        filter_nodes.remove(node)
-                        future = executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, k, deltas, filter_nodes)
-                        futures.append(future)
-                wait(futures)
-        else:    
-            while filter_nodes:
                 with ThreadPoolExecutor() as executor:
                     for node in filter_nodes: 
                         filter_nodes.remove(node)
                         executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, k, deltas, filter_nodes)
+        else:    
+            with ThreadPoolExecutor(max_workers=1000) as executor:
+                while True:
+                    for node in filter_nodes: 
+                        filter_nodes.remove(node)
+                        executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, k, deltas, filter_nodes)
+                    
+                    result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                    print(len(result), '/', len(self.node_data))
+                    if len(result) == len(self.node_data):
+                        return result
                     
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     

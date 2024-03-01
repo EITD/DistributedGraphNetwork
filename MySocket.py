@@ -197,7 +197,8 @@ class MySocket:
                     print(mid, 'duration:', duration)
                 else:
                     print('get reply:', data)
-                self.ask_reply_dict[mid] = data
+                # self.ask_reply_dict[mid] = data
+                self.ask_reply_dict[mid] = (start, end)
 
                 self.conn_pool.release_conn(client_socket)
                 # client_socket.shutdown(socket.SHUT_RDWR)

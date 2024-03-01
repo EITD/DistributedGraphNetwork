@@ -185,11 +185,7 @@ class Worker:
             self.epoch[node] += 1
 
             if self.epoch[node] < target_epoch:
-<<<<<<< HEAD:worker.py
-                needDo.append(node)
-=======
                 filter_nodes.append(node)
->>>>>>> dad6630757a0a0765229816787458b8067561d27:worker_asy_bug.py
 
             request_data = {
                 'update_node_epoch': {

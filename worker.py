@@ -126,17 +126,20 @@ class Worker:
                     if self.update:
                         break
                     # sleep(1)
-                result1 = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == 1}
-                result2 = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-                print(len(result1), '/', len(self.node_data), '   ', len(result2), '/', len(self.node_data), '    ', len(filter_nodes))
+                # for i in range(1, target_epoch + 1):
+                #     tempR = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == i}
+                #     print(len(tempR), '/', len(self.node_data), '   ', end='')
+                # print(len(filter_nodes))
                 
                 if self.update:
-                    needDo = filter_nodes.copy()
                     print('epoch update')
+                    needDo = random.shuffle(filter_nodes.copy())
                     self.update = False
+                    continue
                 
-                if len(result2) == len(self.node_data):
-                    return result2
+                result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                if len(result) == len(self.node_data):
+                    return result
         # return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
 
     def filter_nodes(self, target_epoch):

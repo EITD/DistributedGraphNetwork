@@ -10,17 +10,16 @@ all_graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
 def send_message(message):
     # default send to worker 0
     start_time = time.time()
-    while True:
-        try:
-            proxy = xmlrpc.client.ServerProxy(f"http://localhost:12345")
-            print("Send message: ", message)
-            response = proxy.handle_msg(message)
-            end_time = time.time()
-            print("time: ", end_time - start_time)
-            print(f"Server response: {response}")
-        except Exception as e:
-            print("!!!!!!RPC exception!!!!!!, retrying...")
-            continue
+    proxy = xmlrpc.client.ServerProxy(f"http://localhost:12345")
+    print("Send message: ", message)
+    response = proxy.handle_msg(message)
+    end_time = time.time()
+    print(f"Server response: {response}")
+    print("time: ", end_time - start_time)
+    
+    # long response write into file
+    # with open('check', 'w') as f: 
+    #     f.write(str(json.loads(response)['epoch_dict'])) 
     
         # train test
         # test_mult_epochs(response, epoch)
@@ -111,8 +110,8 @@ def train_asynchronize(epochs, k, deltas):
     
 # query_khop_neighborhood(0, 1, 5000)
 
-# train_synchronize(2, 1, 5000)
+train_synchronize(2, 1, 5000)
 
-train_asynchronize(2, 1, 5000)
+# train_asynchronize(2, 1, 5000)
     
 # train_asynchronize(1, 2, [5000, 5000**2])

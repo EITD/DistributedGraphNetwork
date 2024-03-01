@@ -108,14 +108,13 @@ class Worker:
         return sums
     
     def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
-        filter_nodes = self.filter_nodes(target_epoch)
-        while filter_nodes:
-            with ThreadPoolExecutor() as executor:
-                for node in filter_nodes: 
-                    filter_nodes.remove(node)
-                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, k, deltas, filter_nodes)
-            print(self.node_data)
-                    
+        # filter_nodes = self.filter_nodes(target_epoch)
+        # while filter_nodes:
+        with ThreadPoolExecutor() as executor:
+            for node in list(self.node_data.keys()):
+                # filter_nodes.remove(node)
+                executor.submit(self.update_node_epoch_sync, node, target_epoch, k, deltas)
+                
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
@@ -137,7 +136,32 @@ class Worker:
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
-    def update_node_epoch_and_wait_for_ack(self, node, target_epoch, k, deltas, filter_nodes):
+    def update_node_epoch_sync(self, node, target_epoch, k, deltas):
+        new_feature = self.khop_neighborhood(node, k, deltas)
+        # if new_feature is not None:
+        history = self.node_data.get(node, {})
+        my_epoch = sorted(list(history.keys()), reverse=True)[0]
+        history[my_epoch + 1] = new_feature
+
+        self.epoch[node] += 1
+        # if self.epoch[node] < target_epoch:
+        #     filter_nodes.append(node)
+
+        request_data = {
+            'update_node_epoch': {
+                'nid': node,
+                'epoch': self.epoch[node]
+            }
+        }
+        request_json = json.dumps(request_data)
+
+        with ThreadPoolExecutor() as executor:
+            for server in range(4) and server != self.worker_id:
+                executor.submit(self.send_message, server, request_json)
+        # else:
+        #     filter_nodes.append(node)
+    
+    def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes):
         new_feature = self.khop_neighborhood(node, k, deltas)
         if new_feature is not None:
             history = self.node_data.get(node, {})
@@ -236,26 +260,29 @@ class Worker:
             k = request_data['neighborhood_aggregation_sync']['k']
             deltas = request_data['neighborhood_aggregation_sync']['deltas']
         
-            request_data = {
-                'graph_weight_sync': {
-                    'target_epoch': final_epoch,
-                    'k': k,
-                    'deltas': deltas
+            for epoch in range(1, final_epoch + 1):
+                request_data = {
+                    'graph_weight_sync': {
+                        'target_epoch': epoch,
+                        'k': k,
+                        'deltas': deltas
+                    }
                 }
-            }
-            request_json = json.dumps(request_data)
+                request_json = json.dumps(request_data)
 
-            epoch_dict = {}
-            with ThreadPoolExecutor() as executor:
-                futures = {executor.submit(self.send_message, server, request_json): server for server in range(4)}
-                for future in as_completed(futures):
-                    try:
-                        response = future.result()
-                        request_data = json.loads(response)
-                        epoch_dict.update(request_data['graph_weight_sync'])
-                    except Exception as exc:
-                        print(f"neighborhood_aggregation generated an exception: {exc}")
-            
+                with ThreadPoolExecutor() as executor:
+                    futures = {executor.submit(self.send_message, server, request_json): server for server in range(4)}
+
+                if epoch == final_epoch:
+                    epoch_dict = {}
+                    for future in as_completed(futures):
+                        try:
+                            response = future.result()
+                            request_data = json.loads(response)
+                            epoch_dict.update(request_data['graph_weight_sync'])
+                        except Exception as exc:
+                            print(f"neighborhood_aggregation generated an exception: {exc}")
+                
             request_data = {
                 'epoch_dict' : epoch_dict
             }

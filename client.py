@@ -15,15 +15,15 @@ def send_message(message):
     response = proxy.handle_msg(message)
     end_time = time.time()
     print(f"Server response: {response}")
-    print("time: ", end_time - start_time)
+    print("duration: ", end_time - start_time)
     
     # long response write into file
-    # with open('check', 'w') as f: 
-    #     f.write(str(json.loads(response)['epoch_dict'])) 
-    
-        # train test
-        # test_mult_epochs(response, epoch)
-        # test_all_neighbors(response, k)
+    with open('check1', 'w') as f: 
+        f.write(str(json.loads(response)['epoch_dict'])) 
+
+    # train test
+    # test_mult_epochs(response, epoch)
+    # test_all_neighbors(response, k)
 
 # when node feature all 1(load dummmy), default is 2 ** epoch, multiple epochs, k = 1, deltas = [1]
 def test_mult_epochs(response, epoch):
@@ -110,8 +110,8 @@ def train_asynchronize(epochs, k, deltas):
     
 # query_khop_neighborhood(0, 1, 5000)
 
-train_synchronize(2, 1, 5000)
+# train_synchronize(2, 1, 5000)
 
-# train_asynchronize(2, 1, 5000)
+train_asynchronize(2, 1, 5000)
     
 # train_asynchronize(1, 2, [5000, 5000**2])

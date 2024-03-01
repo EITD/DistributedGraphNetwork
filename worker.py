@@ -63,7 +63,6 @@ class Worker:
 
             for node in random_neighbors:
                 node_epoch = self.epoch.get(node, self.epoch[nid])
-                # print(node_epoch, self.epoch[nid])
                 if node_epoch < self.epoch[nid]:
                     return None
                 
@@ -110,11 +109,8 @@ class Worker:
         return sums
     
     def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
-        # filter_nodes = self.filter_nodes(target_epoch)
-        # while filter_nodes:
         with ThreadPoolExecutor() as executor:
             for node in list(self.node_data.keys()):
-                # filter_nodes.remove(node)
                 executor.submit(self.update_node_epoch_sync, node, target_epoch, k, deltas)
                 
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
@@ -149,15 +145,13 @@ class Worker:
     
     def update_node_epoch_sync(self, node, target_epoch, k, deltas):
         new_feature = self.khop_neighborhood(node, k, deltas)
-        # if new_feature is not None:
+        
         history = self.node_data.get(node, {})
         my_epoch = sorted(list(history.keys()), reverse=True)[0]
         history[my_epoch + 1] = new_feature
 
         self.epoch[node] += 1
-        # if self.epoch[node] < target_epoch:
-        #     filter_nodes.append(node)
-
+        
         request_data = {
             'update_node_epoch': {
                 'nid': node,
@@ -166,12 +160,10 @@ class Worker:
         }
         request_json = json.dumps(request_data)
 
-        with ThreadPoolExecutor() as executor1:
+        with ThreadPoolExecutor() as executor:
             for server in range(4):
                 if server != self.worker_id:
-                    executor1.submit(self.send_message, server, request_json)
-        # else:
-        #     filter_nodes.append(node)
+                    executor.submit(self.send_message, server, request_json)
     
     def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
         new_feature = self.khop_neighborhood(node, k, deltas)
@@ -216,7 +208,6 @@ class Worker:
                 port = 12345 + int(node) % NUM_PARTITIONS
                 proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
                 response = proxy.handle_msg(message)
-                # if response != "":
                 print("Received response message: ", response)
                 return response
             except Exception as e:

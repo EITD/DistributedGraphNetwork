@@ -1,4 +1,5 @@
 import random
+from time import sleep
 from ConvertFile import ConvertFile
 import json
 import sys
@@ -21,6 +22,7 @@ class Worker:
     node_data = {}
     graph = {}
     epoch = {}
+    update = False
 
     def __init__(self, wid):
         self.worker_id = int(wid)
@@ -119,18 +121,27 @@ class Worker:
     
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         filter_nodes = self.filter_nodes(target_epoch)    
-        with ThreadPoolExecutor(max_workers=500) as executor:
+        needDo = filter_nodes.copy()
+        with ThreadPoolExecutor() as executor:
             while True:
-                for node in filter_nodes: 
-                    filter_nodes.remove(node)
-                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, k, deltas, filter_nodes)
+                for node in needDo: 
+                    needDo.remove(node)
+                    executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
+                    if self.update:
+                        break
+                    # sleep(1)
+                result1 = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == 1}
+                result2 = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                print(len(result1), '/', len(self.node_data), '   ', len(result2), '/', len(self.node_data), '    ', len(filter_nodes))
                 
-                result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-                print(len(result), '/', len(self.node_data))
-                if len(result) == len(self.node_data):
-                    return result
-                       
-        return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                if self.update:
+                    needDo = filter_nodes.copy()
+                    print('epoch update')
+                    self.update = False
+                
+                if len(result2) == len(self.node_data):
+                    return result2
+        # return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
 
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
@@ -155,13 +166,14 @@ class Worker:
         }
         request_json = json.dumps(request_data)
 
-        with ThreadPoolExecutor() as executor:
-            for server in range(4) and server != self.worker_id:
-                executor.submit(self.send_message, server, request_json)
+        with ThreadPoolExecutor() as executor1:
+            for server in range(4):
+                if server != self.worker_id:
+                    executor1.submit(self.send_message, server, request_json)
         # else:
         #     filter_nodes.append(node)
     
-    def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes):
+    def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
         new_feature = self.khop_neighborhood(node, k, deltas)
         if new_feature is not None:
             history = self.node_data.get(node, {})
@@ -170,7 +182,9 @@ class Worker:
 
             self.epoch[node] += 1
             if self.epoch[node] < target_epoch:
-                filter_nodes.append(node)
+                needDo.append(node)
+            else:
+                filter_nodes.remove(node)
 
             request_data = {
                 'update_node_epoch': {
@@ -180,11 +194,12 @@ class Worker:
             }
             request_json = json.dumps(request_data)
 
-            with ThreadPoolExecutor() as executor:
-                for server in range(4) and server != self.worker_id:
-                    executor.submit(self.send_message, server, request_json)
-        else:
-            filter_nodes.append(node)
+            with ThreadPoolExecutor() as executor1:
+                for server in range(4):
+                    if server != self.worker_id:
+                        executor1.submit(self.send_message, server, request_json)
+        # else:
+        #     filter_nodes.append(node)
     
     # simple rpc server, start thread in each request but not work
     # def send_to_other(self, node, message):
@@ -201,11 +216,12 @@ class Worker:
                 port = 12345 + int(node) % NUM_PARTITIONS
                 proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
                 response = proxy.handle_msg(message)
-                if response != "":
-                    print("Received response message: ", response)
+                # if response != "":
+                print("Received response message: ", response)
                 return response
             except Exception as e:
-                # print("!!!!!!RPC exception!!!!!!")
+                print(e)
+                print("!!!!!!RPC exception!!!!!!, retrying...")
                 continue
 
 # TODO: improve: rpc call different methods
@@ -349,11 +365,14 @@ class Worker:
             epoch = request_data['update_node_epoch']['epoch']
 
             self.epoch[node] = epoch
+            
+            self.update = True
 
-            return
+            return 'ok'
         
         request_json = json.dumps(request_data)
         
+        print('reply:', request_json)
         return request_json
     
 class ThreadedXMLRPCServer(ThreadingMixIn, SimpleXMLRPCServer):

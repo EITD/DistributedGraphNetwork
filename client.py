@@ -8,14 +8,20 @@ from ConvertFile import ConvertFile
 all_graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
 
 def send_message(message):
-    start_time = time.time()
     # default send to worker 0
-    with xmlrpc.client.ServerProxy("http://localhost:12345") as proxy:
-        response = proxy.handle_msg(message)
-        print(f"Server response: {response}")
-        end_time = time.time()
-        print("time: ", end_time - start_time)
-
+    start_time = time.time()
+    while True:
+        try:
+            proxy = xmlrpc.client.ServerProxy(f"http://localhost:12345")
+            print("Send message: ", message)
+            response = proxy.handle_msg(message)
+            end_time = time.time()
+            print("time: ", end_time - start_time)
+            print(f"Server response: {response}")
+        except Exception as e:
+            print("!!!!!!RPC exception!!!!!!, retrying...")
+            continue
+    
         # train test
         # test_mult_epochs(response, epoch)
         # test_all_neighbors(response, k)
@@ -27,7 +33,7 @@ def test_mult_epochs(response, epoch):
             if 2 ** epoch != value:
                     print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
 
- # when node feature all 1(load dummmy), default is 1, epoch = 1, customize k, deltas = [5000, 5000**2...]
+# when node feature all 1(load dummmy), default is 1, epoch = 1, customize k, deltas = [5000, 5000**2...]
 def test_all_neighbors(response, k):
     data = json.loads(response)['epoch_dict']
     for key, value in data.items():
@@ -105,8 +111,8 @@ def train_asynchronize(epochs, k, deltas):
     
 # query_khop_neighborhood(0, 1, 5000)
 
-train_synchronize(2, 1, 5000)
+# train_synchronize(2, 1, 5000)
 
-# train_asynchronize(2, 1, 5000)
+train_asynchronize(2, 1, 5000)
     
 # train_asynchronize(1, 2, [5000, 5000**2])

@@ -176,8 +176,6 @@ class Worker:
             self.epoch[node] += 1
             if self.epoch[node] < target_epoch:
                 needDo.append(node)
-            else:
-                filter_nodes.remove(node)
 
             request_data = {
                 'update_node_epoch': {

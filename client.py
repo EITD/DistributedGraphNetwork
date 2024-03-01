@@ -72,11 +72,10 @@ def train_synchronize(epochs, k, deltas):
     if type(deltas) is int:
         deltas = [deltas]
     request_data = {
-        'neighborhood_aggregation': {
+        'neighborhood_aggregation_sync': {
             'epochs': epochs,
             'k': k,
-            'deltas': deltas,
-            'sync': True
+            'deltas': deltas
         }
     }
     request_json = json.dumps(request_data)
@@ -86,11 +85,10 @@ def train_asynchronize(epochs, k, deltas):
     if type(deltas) is int:
         deltas = [deltas]
     request_data = {
-        'neighborhood_aggregation': {
+        'neighborhood_aggregation_async': {
             'epochs': epochs,
             'k': k,
-            'deltas': deltas,
-            'sync': False
+            'deltas': deltas
         }
     }
     request_json = json.dumps(request_data)
@@ -107,8 +105,8 @@ def train_asynchronize(epochs, k, deltas):
     
 # query_khop_neighborhood(0, 1, 5000)
 
-# train_synchronize(2, 1, 5000)
+train_synchronize(2, 1, 5000)
 
-train_asynchronize(2, 1, 5000)
+# train_asynchronize(2, 1, 5000)
     
 # train_asynchronize(1, 2, [5000, 5000**2])

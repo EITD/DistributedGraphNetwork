@@ -105,6 +105,8 @@ class Worker:
                         sums += result['node_feature']
                     except Exception as exc:
                         print(f"khop_neighborhood generated an exception: {exc}")
+                        with open('error', 'w') as f: 
+                            f.write("khop_neighborhood generated an exception")
         
         return sums
     
@@ -117,33 +119,40 @@ class Worker:
     
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         filter_nodes = self.filter_nodes(target_epoch)    
-        needDo = filter_nodes.copy()
+        # needDo = filter_nodes.copy()
         with ThreadPoolExecutor() as executor:
             while True:
-                for node in needDo: 
-                    needDo.remove(node)
-                    executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
-                    if self.update:
-                        break
+                for node in filter_nodes:
+                    filter_nodes.remove(node)
+                    executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes)
+                
+                if(len(self.filter_nodes(target_epoch)) == 0):
+                    break
+                
+                # for node in needDo: 
+                #     needDo.remove(node)
+                #     executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
+                #     if self.update:
+                #         break
                     # sleep(1)
-                result1 = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == 1}
-                result2 = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-                print(len(result1), '/', len(self.node_data), '   ', len(result2), '/', len(self.node_data), '    ', len(filter_nodes))
+                # result1 = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == 1}
+                # result2 = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                # print(len(result1), '/', len(self.node_data), '   ', len(result2), '/', len(self.node_data), '    ', len(filter_nodes))
                 
-                if self.update:
-                    needDo = filter_nodes.copy()
-                    print('epoch update')
-                    self.update = False
+                # if self.update:
+                #     needDo = filter_nodes.copy()
+                #     print('epoch update')
+                #     self.update = False
                 
-                if len(result2) == len(self.node_data):
-                    return result2
-        # return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                # if len(result2) == len(self.node_data):
+                #     return result2
+        return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
 
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
-    def update_node_epoch_sync(self, node, target_epoch, k, deltas):
+    def update_node_epoch_sync(self, node, k, deltas):
         new_feature = self.khop_neighborhood(node, k, deltas)
         
         history = self.node_data.get(node, {})
@@ -165,18 +174,18 @@ class Worker:
                 if server != self.worker_id:
                     executor.submit(self.send_message, server, request_json)
     
-    def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
+    def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes):
         new_feature = self.khop_neighborhood(node, k, deltas)
+
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
             history[my_epoch + 1] = new_feature
 
             self.epoch[node] += 1
+
             if self.epoch[node] < target_epoch:
-                needDo.append(node)
-            else:
-                filter_nodes.remove(node)
+                filter_nodes.append(node)
 
             request_data = {
                 'update_node_epoch': {
@@ -186,12 +195,12 @@ class Worker:
             }
             request_json = json.dumps(request_data)
 
-            with ThreadPoolExecutor() as executor1:
+            with ThreadPoolExecutor() as executor:
                 for server in range(4):
                     if server != self.worker_id:
-                        executor1.submit(self.send_message, server, request_json)
-        # else:
-        #     filter_nodes.append(node)
+                        executor.submit(self.send_message, server, request_json)
+        else:
+            filter_nodes.append(node)
     
     # simple rpc server, start thread in each request but not work
     # def send_to_other(self, node, message):
@@ -211,8 +220,10 @@ class Worker:
                 print("Received response message: ", response)
                 return response
             except Exception as e:
-                print(e)
-                print("!!!!!!RPC exception!!!!!!, retrying...")
+                # print(e)
+                # print("!!!!!!RPC exception!!!!!!, retrying...")
+                with open('error', 'w') as f: 
+                    f.write(message)
                 continue
 
 # TODO: improve: rpc call different methods
@@ -318,6 +329,8 @@ class Worker:
                         epoch_dict.update(request_data['graph_weight_async'])
                     except Exception as exc:
                         print(f"neighborhood_aggregation generated an exception: {exc}")
+                        with open('error', 'w') as f: 
+                            f.write("neighborhood_aggregation generated an exception")
             
             request_data = {
                 'epoch_dict' : epoch_dict
@@ -357,13 +370,13 @@ class Worker:
 
             self.epoch[node] = epoch
             
-            self.update = True
+            # self.update = True
 
             return 'ok'
         
         request_json = json.dumps(request_data)
         
-        print('reply:', request_json)
+        # print('reply:', request_json)
         return request_json
     
 class ThreadedXMLRPCServer(ThreadingMixIn, SimpleXMLRPCServer):

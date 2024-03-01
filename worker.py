@@ -116,15 +116,13 @@ class Worker:
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
-        filter_nodes = self.filter_nodes(target_epoch)    
+        filter_nodes = self.filter_nodes(target_epoch)
         needDo = filter_nodes.copy()
         with ThreadPoolExecutor() as executor:
             while True:
                 for node in needDo: 
                     needDo.remove(node)
-                    executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
-                    if self.update:
-                        break
+                    executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, needDo)
                     # sleep(1)
                 # for i in range(1, target_epoch + 1):
                 #     tempR = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == i}
@@ -133,7 +131,7 @@ class Worker:
                 
                 if self.update:
                     print('epoch update')
-                    needDo = random.shuffle(filter_nodes.copy())
+                    needDo = random.shuffle(self.filter_nodes(target_epoch))
                     self.update = False
                     continue
                 
@@ -168,7 +166,7 @@ class Worker:
                 if server != self.worker_id:
                     executor.submit(self.send_message, server, request_json)
     
-    def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
+    def update_node_epoch_async(self, node, target_epoch, k, deltas, needDo):
         new_feature = self.khop_neighborhood(node, k, deltas)
         if new_feature is not None:
             history = self.node_data.get(node, {})

@@ -105,6 +105,8 @@ class Worker:
                         sums += result['node_feature']
                     except Exception as exc:
                         print(f"khop_neighborhood generated an exception: {exc}")
+                        with open('error', 'a') as f: 
+                            f.write("nkhop_neighborhood generated an exception")
         
         return sums
     
@@ -214,8 +216,10 @@ class Worker:
                 print("Received response message: ", response)
                 return response
             except Exception as e:
-                print(e)
-                print("!!!!!!RPC exception!!!!!!, retrying...")
+                # print(e)
+                # print("!!!!!!RPC exception!!!!!!, retrying...")
+                with open('error', 'a') as f:  
+                    f.write(message)
                 continue
 
 # TODO: improve: rpc call different methods
@@ -321,6 +325,8 @@ class Worker:
                         epoch_dict.update(request_data['graph_weight_async'])
                     except Exception as exc:
                         print(f"neighborhood_aggregation generated an exception: {exc}")
+                        with open('error', 'a') as f:  
+                                f.write("neighborhood_aggregation generated an exception")
             
             request_data = {
                 'epoch_dict' : epoch_dict

@@ -1,5 +1,4 @@
 import random
-import threading
 from time import sleep
 from ConvertFile import ConvertFile
 import json
@@ -24,24 +23,6 @@ class Worker:
     graph = {}
     epoch = {}
     update = False
-    node_data_lock = threading.Lock()
-    epoch_lock = threading.Lock()
-    
-    def write_node_data(self, key, value):
-        with self.node_data_lock:
-            self.node_data[key] = value
-
-    def read_node_data(self, key):
-        with self.node_data_lock:
-            return self.node_data.get(key, {})
-    
-    def write_epoch(self, key, value):
-        with self.epoch_lock:
-            self.epoch[key] = value
-
-    def read_epoch(self, key, defalut=0):
-        with self.epoch_lock:
-            return self.epoch.get(key, defalut)
 
     def __init__(self, wid):
         self.worker_id = int(wid)
@@ -59,7 +40,7 @@ class Worker:
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         
     def node_feature(self, nid, epoch):
-        history = self.read_node_data(nid)
+        history = self.node_data.get(nid, {})
         return history.get(epoch, NODE_DEFAULT_FEATURE)
         
     def feature_and_neighborhood(self, nid, delta, epoch):
@@ -71,7 +52,7 @@ class Worker:
         return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
-        sums = self.node_feature(nid, self.read_epoch(nid, 0))
+        sums = self.node_feature(nid, self.epoch.get(nid, 0))
         node_neighbors_set = set()
         if nid in self.node_data.keys():
             node_neighbors_set = set(self.graph.neighbors(nid))
@@ -81,17 +62,17 @@ class Worker:
             node_neighbors_set = set()
 
             for node in random_neighbors:
-                node_epoch = self.read_epoch(node, float('inf'))
-                if node_epoch < self.read_epoch(nid):
+                node_epoch = self.epoch.get(node, self.epoch[nid])
+                if node_epoch < self.epoch[nid]:
                     return None
                 
                 if (int(node) % NUM_PARTITIONS) == self.worker_id:
                     if j < k - 1:
-                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.read_epoch(nid, 0))
+                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch.get(nid, 0))
                         node_neighbors_set.update(neighborhood)
                         sums += node_feature
                     else:
-                        node_feature = self.node_feature(node, self.read_epoch(nid, 0))
+                        node_feature = self.node_feature(node, self.epoch.get(nid, 0))
                         sums += node_feature
                     random_neighbors.remove(node)
 
@@ -103,13 +84,13 @@ class Worker:
                             'feature_and_neighborhood' : {
                                 'nid' : node,
                                 'delta' : deltas[j + 1],
-                                'epoch' : self.read_epoch(nid, 0)
+                                'epoch' : self.epoch.get(nid, 0)
                             }
                         }
                     else:
                         request_data = {
                             'node_feature' : node,
-                            'epoch' : self.read_epoch(nid, 0)
+                            'epoch' : self.epoch.get(nid, 0)
                         }
                     future = executor.submit(self.send_message, node, json.dumps(request_data))
                     future_to_node[future] = node
@@ -166,7 +147,7 @@ class Worker:
 
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
-                if self.read_epoch(node) < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
+                if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
     def update_node_epoch_sync(self, node, target_epoch, k, deltas):
         new_feature = self.khop_neighborhood(node, k, deltas)
@@ -193,14 +174,11 @@ class Worker:
     def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
         new_feature = self.khop_neighborhood(node, k, deltas)
         if new_feature is not None:
-            history = self.read_node_data(node).copy()
+            history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
             history[my_epoch + 1] = new_feature
-            self.write_node_data(node, history)
 
-            readEpoch = self.read_epoch(node)
-            self.write_epoch(node, readEpoch+1)
-            
+            self.epoch[node] += 1
             if self.epoch[node] < target_epoch:
                 needDo.append(node)
                 filter_nodes.append(node)
@@ -208,7 +186,7 @@ class Worker:
             request_data = {
                 'update_node_epoch': {
                     'nid': node,
-                    'epoch': self.read_epoch(node)
+                    'epoch': self.epoch[node]
                 }
             }
             request_json = json.dumps(request_data)
@@ -251,7 +229,7 @@ class Worker:
         
         if 'node_feature' in request_data:
             nid = request_data['node_feature']
-            epoch = int(request_data.get('epoch', self.read_epoch(nid, 0)))
+            epoch = int(request_data.get('epoch', self.epoch.get(nid, 0)))
 
             if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                 response = self.send_message(nid, message)
@@ -386,8 +364,7 @@ class Worker:
             node = request_data['update_node_epoch']['nid']
             epoch = request_data['update_node_epoch']['epoch']
 
-            self.write_epoch(node, epoch)
-            # self.epoch[node] = epoch
+            self.epoch[node] = epoch
             
             self.update = True
 

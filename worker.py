@@ -177,11 +177,12 @@ class Worker:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
             history[my_epoch + 1] = new_feature
-
+            
             self.epoch[node] += 1
-            if self.epoch[node] < target_epoch:
-                needDo.append(node)
-                filter_nodes.append(node)
+            
+            while (sorted(list(self.node_data.get(node, {}).keys()), reverse=True)[0] == my_epoch + 1) and (self.epoch[node] == my_epoch + 1):
+                if new_feature == self.node_data.get(node, {})[my_epoch + 1]:
+                    break
 
             request_data = {
                 'update_node_epoch': {
@@ -195,6 +196,10 @@ class Worker:
                 for server in range(4):
                     if server != self.worker_id:
                         executor1.submit(self.send_message, server, request_json)
+            
+            if self.epoch[node] < target_epoch:
+                needDo.append(node)
+                filter_nodes.append(node)
         else:
             filter_nodes.append(node)
     

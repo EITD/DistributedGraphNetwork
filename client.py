@@ -110,8 +110,8 @@ def train_asynchronize(epochs, k, deltas):
     
 # query_khop_neighborhood(0, 1, 5000)
 
-train_synchronize(2, 1, 5000)
+# train_synchronize(2, 1, 5000)
 
-# train_asynchronize(1, 1, 5000)
+train_asynchronize(2, 1, 5000)
     
 # train_asynchronize(1, 2, [5000, 5000**2])

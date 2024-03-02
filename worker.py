@@ -1,4 +1,5 @@
 import random
+import threading
 from time import sleep
 from ConvertFile import ConvertFile
 import json
@@ -23,6 +24,15 @@ class Worker:
     graph = {}
     epoch = {}
     update = False
+    node_data_lock = threading.Lock()
+    
+    def write_node_data(self, key, value):
+        with self.node_data_lock:
+            self.node_data[key] = value
+
+    def read_node_data(self, key):
+        with self.node_data_lock:
+            return self.node_data.get(key, {})
 
     def __init__(self, wid):
         self.worker_id = int(wid)
@@ -40,7 +50,7 @@ class Worker:
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         
     def node_feature(self, nid, epoch):
-        history = self.node_data.get(nid, {})
+        history = self.read_node_data(nid)
         return history.get(epoch, NODE_DEFAULT_FEATURE)
         
     def feature_and_neighborhood(self, nid, delta, epoch):
@@ -174,9 +184,10 @@ class Worker:
     def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
         new_feature = self.khop_neighborhood(node, k, deltas)
         if new_feature is not None:
-            history = self.node_data.get(node, {})
+            history = self.read_node_data(node).copy()
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
             history[my_epoch + 1] = new_feature
+            self.write_node_data(node, history)
 
             self.epoch[node] += 1
             if self.epoch[node] < target_epoch:

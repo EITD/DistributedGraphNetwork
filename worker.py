@@ -180,8 +180,8 @@ class Worker:
             
             self.epoch[node] += 1
             
-            while (sorted(list(self.node_data.get(node, {}).keys()), reverse=True)[0] == my_epoch + 1) and (self.epoch[node] == my_epoch + 1):
-                if new_feature == self.node_data.get(node, {})[my_epoch + 1]:
+            while True:
+                if (sorted(list(self.node_data.get(node, {}).keys()), reverse=True)[0] == my_epoch + 1) and (self.epoch[node] == my_epoch + 1) and (new_feature == self.node_data.get(node, {})[my_epoch + 1]):
                     break
 
             request_data = {

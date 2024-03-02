@@ -18,7 +18,7 @@ def send_message(message):
     print("duration: ", end_time - start_time)
     
     # long response write into file
-    with open('check1', 'w') as f: 
+    with open('check', 'w') as f: 
         f.write(str(json.loads(response)['epoch_dict'])) 
 
     # train test

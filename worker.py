@@ -76,7 +76,7 @@ class Worker:
                         sums += node_feature
                     random_neighbors.remove(node)
 
-            with ThreadPoolExecutor() as executor:
+            with ThreadPoolExecutor(max_workers=100) as executor:
                 future_to_node = {}
                 for node in random_neighbors:
                     if j < k - 1:
@@ -120,7 +120,7 @@ class Worker:
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         filter_nodes = self.filter_nodes(target_epoch)
         needDo = filter_nodes.copy()
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=100) as executor:
             while True:
                 for node in needDo: 
                     needDo.remove(node)
@@ -191,7 +191,7 @@ class Worker:
             }
             request_json = json.dumps(request_data)
 
-            with ThreadPoolExecutor() as executor1:
+            with ThreadPoolExecutor(max_workers=2) as executor1:
                 for server in range(4):
                     if server != self.worker_id:
                         executor1.submit(self.send_message, server, request_json)

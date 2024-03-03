@@ -1,4 +1,5 @@
 import json
+from xmlrpc.server import XMLRPCDocGenerator
 from MySocket import MySocket
 import time
 
@@ -58,3 +59,24 @@ print('send -> get reply', end_ - start_) # send -> get reply 0.3279869556427002
 # end = time.time()
 
 # print('loads', end - start) # loads 0.0
+
+def send_message(message):
+    start_ = time.time()
+    print("Send message: ", message)
+    while True:
+        try:
+            proxy = XMLRPCDocGenerator.client.ServerProxy(f"http://localhost:12345")
+            response = proxy.handle_msg(message)
+            print("Received response message: ", response)
+            end_ = time.time()
+            print('send -> get reply', end_ - start_)
+            print()
+            return response
+        except Exception as e:
+            # print(e)
+            # print("!!!!!!RPC exception!!!!!!, retrying...")
+            with open('error', 'w') as f: 
+                f.write(message)
+            continue
+
+        

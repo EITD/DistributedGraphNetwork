@@ -2,13 +2,40 @@ import signal
 import socket
 import json
 import sys
+import time
+
+def ask(msg):
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
+    client_socket.connect(('localhost',12345))
+    
+    start = time.time()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start)), end=' ')
+    
+    client_socket.send(msg.encode())
+    print('ask:', msg)
+    
+    data = client_socket.recv(102400).decode()
+    
+    end = time.time()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end)), end=' ')
+    
+    print('get reply:', data)
+
+    client_socket.shutdown(socket.SHUT_RDWR)
+    client_socket.close()
+    
+    print('duration:', end - start)
+    
+    return data
 
 def query_node_feature(nid):
     request_data = {
         'node_feature': str(nid)
     }
     request_json = json.dumps(request_data)
-    s.ask(0, node=nid, msg=request_json)
+    return ask(request_json)
 
 def query_khop_neighborhood(nid, k, deltas):
     if type(deltas) is int:
@@ -21,44 +48,51 @@ def query_khop_neighborhood(nid, k, deltas):
         }
     }
     request_json = json.dumps(request_data)
-    s.ask(0, node=nid, msg=request_json)
-
-def aggregate_neighborhood(nid, epochs):
+    return ask(request_json)
+    
+def train_synchronize(epochs, k, deltas):
+    if type(deltas) is int:
+        deltas = [deltas]
     request_data = {
-        'neighborhood_aggregation': {
-            'epochs': epochs
+        'neighborhood_aggregation_sync': {
+            'epochs': epochs,
+            'k': k,
+            'deltas': deltas
         }
     }
     request_json = json.dumps(request_data)
-    s.ask(0, node=nid, msg=request_json)
+    return ask(request_json)
 
+def train_asynchronize(epochs, k, deltas):
+    if type(deltas) is int:
+        deltas = [deltas]
+    request_data = {
+        'neighborhood_aggregation_async': {
+            'epochs': epochs,
+            'k': k,
+            'deltas': deltas
+        }
+    }
+    request_json = json.dumps(request_data)
+    return ask(request_json)
 
-# query_node_feature(0)
+response = ''
 
-# query_node_feature(1)
+# response = query_node_feature(0)
 
-query_khop_neighborhood(3, 1, 5000)
+# response = query_node_feature(1)
 
-# query_khop_neighborhood(3, 3, [2, 18, 32])
+# response = query_khop_neighborhood(4031, 2, [5000, 5000**2])
 
-# aggregate_neighborhood(0, 2)
+# response = query_khop_neighborhood(3, 3, [2, 18, 32])
 
-# epoch = 4
+# response = query_khop_neighborhood(0, 1, 5000)
 
-while True:
-    if 0 in s.ask_reply_dict:
-        a = s.ask_reply_dict[0]
-        
-        print(a)
+# response = train_synchronize(2, 1, 5000)
 
-        # dic = json.loads(a)['epoch_dict']
+response = train_asynchronize(2, 1, 5000)
 
-        # for key, value in dic.items():
-        #         if (2 ** epoch != value):
-        #                 print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
-        
-        # with open('check', 'w') as f:
-        #     f.write(str(json.loads(a)['epoch_dict']))
-        break
+# response = train_asynchronize(5, 1, 1)
 
-# aggregate_neighborhood(0, 5)
+# with open('check', 'a') as f: 
+#     f.write('\n\n\n\n' + str(json.loads(response)['epoch_dict'])) 

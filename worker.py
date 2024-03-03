@@ -12,6 +12,7 @@ NODE_FEATURES = "./data/node_features.txt"
 host = 'localhost'
 testIp = host
 serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
+NODE_DEFAULT_FEATURE = 0
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -41,7 +42,7 @@ class Worker:
         
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
-        return history.get(epoch, 0)
+        return history.get(epoch, NODE_DEFAULT_FEATURE)
         
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
@@ -54,6 +55,7 @@ class Worker:
     def khop_neighborhood(self, nid, k, deltas):
         sums = self.node_feature(nid, self.epoch[nid])
         
+        # node_neighbors_set = set()
         if nid in self.node_data.keys():
             node_neighbors_set = set(self.graph.neighbors(nid))
         else:
@@ -61,6 +63,7 @@ class Worker:
         
         for j in range(k): # [2,3,2]
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
+            # node_neighbors_set = set()
             
             for node in random_neighbors:
                 node_epoch = self.epoch.get(node, self.epoch[nid])
@@ -68,18 +71,21 @@ class Worker:
                     return None
             
             feature_and_neighborhood_list = []
-            only_node_feature_list = []
             feature_and_neighborhood_list_ask = []
-            only_node_feature_list_ask = []
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for node in random_neighbors:
-                    if j < k - 1:
-                        if (int(node) % NUM_PARTITIONS) == self.worker_id:
+                    if (int(node) % NUM_PARTITIONS) == self.worker_id:
+                        if j < k - 1:
                             print(f'!!!self get: {node}!!!')
                             future = executor.submit(self.feature_and_neighborhood, node, deltas[j + 1], self.epoch[nid])
                             feature_and_neighborhood_list.append(future)
-                        else:
+                        else: 
+                            print(f'!!!self get: {node}!!!')
+                            future = executor.submit(self.node_feature, node, self.epoch[nid])
+                            feature_and_neighborhood_list.append(future)
+                    else:
+                        if j < k - 1:
                             request_data = {
                                 'feature_and_neighborhood' : {
                                     'nid' : node,
@@ -87,13 +93,8 @@ class Worker:
                                     'epoch' : self.epoch[nid]
                                 }
                             }
-                            request_json = json.dumps(request_data)
-                            future = executor.submit(ask, node, request_json)
+                            future = executor.submit(ask, node, json.dumps(request_data))
                             feature_and_neighborhood_list_ask.append(future)
-                    else:
-                        if (int(node) % NUM_PARTITIONS) == self.worker_id:
-                            future = executor.submit(self.node_feature, node, self.epoch[nid])
-                            only_node_feature_list.append(future)
                         else:
                             request_data = {
                                 'node_feature' : node,
@@ -101,31 +102,32 @@ class Worker:
                             }
                             request_json = json.dumps(request_data)
                             future = executor.submit(ask, node, request_json)
-                            only_node_feature_list_ask.append(future)
+                            feature_and_neighborhood_list_ask.append(future)
 
             node_neighbors_set = set()
             
             for future in feature_and_neighborhood_list:
-                node_feature, neighborhood = future.result()
-                node_neighbors_set.update(neighborhood)
-                sums += node_feature
-            for future in only_node_feature_list:
-                node_feature = future.result()
+                if j < k - 1:
+                    node_feature, neighborhood = future.result()
+                    node_neighbors_set.update(neighborhood)
+                else:
+                    node_feature = future.result()
                 sums += node_feature
             for future in feature_and_neighborhood_list_ask:
                 data = json.loads(future.result())
-                node_feature = data['node_feature']
-                neighborhood = data['neighborhood']
-                node_neighbors_set.update(neighborhood)
-                sums += node_feature
-            for future in only_node_feature_list_ask:
-                data = json.loads(future.result())
-                node_feature = data['node_feature']
-                sums += node_feature
-        
+                if j < k - 1:
+                    node_neighbors_set.update(data['neighborhood'])
+                sums += data['node_feature']
         return sums
     
-    def aggregate_neighborhood(self, target_epoch):
+    def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for node in list(self.node_data.keys()):
+                executor.submit(self.update_node_epoch_sync, node, k, deltas)
+                
+        return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+    
+    def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         filter_nodes = self.filter_nodes(target_epoch)
         needDo = filter_nodes.copy()
         temp = needDo.copy()
@@ -134,7 +136,7 @@ class Worker:
                 for node in temp:
                     needDo.remove(node)
                     filter_nodes.remove(node)
-                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, 1, [5000], filter_nodes, needDo)
+                    executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
                     if self.update:
                         break
                 
@@ -149,14 +151,36 @@ class Worker:
                 result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                 if len(result) == len(self.node_data):
                     break
-        
+
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-    
+
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
-    def update_node_epoch_and_wait_for_ack(self, node, target_epoch, k, deltas, filter_nodes, needDo):
+    def update_node_epoch_sync(self, node, k, deltas):
+        new_feature = self.khop_neighborhood(node, k, deltas)
+        
+        history = self.node_data.get(node, {})
+        my_epoch = sorted(list(history.keys()), reverse=True)[0]
+        history[my_epoch + 1] = new_feature
+
+        self.epoch[node] += 1
+        
+        request_data = {
+            'update_node_epoch': {
+                'nid': node,
+                'epoch': self.epoch[node]
+            }
+        }
+        request_json = json.dumps(request_data)
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for server in range(4):
+                if server != self.worker_id:
+                    executor.submit(tell, server, request_json)
+    
+    def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
         new_feature = self.khop_neighborhood(node, k, deltas)
 
         if new_feature is not None:
@@ -177,7 +201,7 @@ class Worker:
             with concurrent.futures.ThreadPoolExecutor() as executor1:
                 for server in range(4):
                     if server != self.worker_id:
-                        executor1.submit(self.s.tell, server, request_json)
+                        executor1.submit(tell, server, request_json)
             
             if self.epoch[node] < target_epoch:
                 needDo.append(node)
@@ -228,45 +252,97 @@ class Worker:
                     'neighborhood' : neighborhoodSet # [nid, nid, nid...]
                 }
             
-            elif 'neighborhood_aggregation' in request_data:
-                final_epoch = request_data['neighborhood_aggregation']['epochs']
+            elif 'neighborhood_aggregation_sync' in request_data:
+                final_epoch = request_data['neighborhood_aggregation_sync']['epochs']
+                k = request_data['neighborhood_aggregation_sync']['k']
+                deltas = request_data['neighborhood_aggregation_sync']['deltas']
+            
+                for epoch in range(1, final_epoch + 1):
+                    request_data = {
+                        'graph_weight_sync': {
+                            'target_epoch': epoch,
+                            'k': k,
+                            'deltas': deltas
+                        }
+                    }
+                    request_json = json.dumps(request_data)
+
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        futures = [executor.submit(ask, server, request_json) for server in range(4)]
+
+                    if epoch <= final_epoch:
+                        epoch_dict = {}
+                        for future in futures:
+                            try:
+                                response = future.result()
+                                request_data = json.loads(response)
+                                epoch_dict.update(request_data['graph_weight_sync'])
+                            except Exception as exc:
+                                print(f"neighborhood_aggregation generated an exception: {exc}")
                     
                 request_data = {
-                    'graph_weight': {
-                        'target_epoch': final_epoch
+                    'epoch_dict' : epoch_dict
+                }
+
+            elif 'neighborhood_aggregation_async' in request_data:
+                final_epoch = request_data['neighborhood_aggregation_async']['epochs']
+                k = request_data['neighborhood_aggregation_async']['k']
+                deltas = request_data['neighborhood_aggregation_async']['deltas']
+
+                request_data = {
+                    'graph_weight_async': {
+                        'target_epoch': final_epoch,
+                        'k': k,
+                        'deltas': deltas
                     }
                 }
                 request_json = json.dumps(request_data)
 
-                for server in list(self.s.serverDict.keys()):
-                    self.s.ask(threading.current_thread().name + str(server), node=server, msg=request_json)
-                
-                # sum_graph = 0
                 epoch_dict = {}
-                okDict = {server:False for server in list(self.s.serverDict.keys())}
-                while not all(value for value in okDict.values()):
-                    for server in list(self.s.serverDict.keys()):
-                        if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
-                            message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
-                            request_data = json.loads(message)
-                            epoch_dict.update(request_data['graph_weight'])
-                            okDict[server] = True
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    futures = [executor.submit(ask, server, request_json) for server in range(4)]
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            response = future.result()
+                            request_data = json.loads(response)
+                            epoch_dict.update(request_data['graph_weight_async'])
+                        except Exception as exc:
+                            print(f"neighborhood_aggregation generated an exception: {exc}")
 
                 request_data = {
                     'epoch_dict' : epoch_dict
-                }     
+                }    
                         
-            elif 'graph_weight' in request_data:
-                target_epoch = request_data['graph_weight']['target_epoch']
+            elif 'graph_weight_sync' in request_data:
+                target_epoch = request_data['graph_weight_sync']['target_epoch']
+                k = request_data['graph_weight_sync']['k']
+                deltas = request_data['graph_weight_sync']['deltas']
 
                 if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
                     request_data = {
-                        'graph_weight' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                        'graph_weight_sync' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                     } 
                 else:
                     request_data = {
-                        'graph_weight' : self.aggregate_neighborhood(target_epoch)
+                        'graph_weight_sync' : self.aggregate_neighborhood_sync(target_epoch, k, deltas)
                     }
+            
+            elif 'graph_weight_async' in request_data:
+                target_epoch = request_data['graph_weight_async']['target_epoch']
+                k = request_data['graph_weight_async']['k']
+                deltas = request_data['graph_weight_async']['deltas']
+
+                if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
+                    request_data = {
+                        'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                    } 
+                else:
+                    request_data = {
+                        'graph_weight_async' : self.aggregate_neighborhood_async(target_epoch, k, deltas)
+                    }
+
+                with open('result', 'a') as f: 
+                    f.write(str(self.worker_id) + str(request_data) + '\n')
             
             elif 'update_node_epoch' in request_data:
                 node = request_data['update_node_epoch']['nid']
@@ -276,7 +352,7 @@ class Worker:
                 
                 self.update = True
 
-                request_data = 'ok'
+                return
             
             request_json = json.dumps(request_data)
         except NodeForOtherWorker:
@@ -290,15 +366,13 @@ def handle_client(client_socket, worker):
     
     if b'__TELL__' not in data:
         message = worker.handle_msg(data.decode())
+        print('send out:', message)
+        client_socket.send(message.encode())
     else:
-        message = worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
+        worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
         # client_socket.send('ok'.encode())
         client_socket.shutdown(socket.SHUT_RDWR)
         client_socket.close()
-    
-    print('send out:', message)
-    
-    client_socket.send(message.encode())
 
 def ask(node, msg):
     while True:

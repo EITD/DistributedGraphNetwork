@@ -128,25 +128,23 @@ class Worker:
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         filter_nodes = self.filter_nodes(target_epoch)
         needDo = filter_nodes.copy()
+        temp = needDo.copy()
         with ThreadPoolExecutor() as executor:
             while True:
-                for node in needDo: 
+                for node in temp:
                     needDo.remove(node)
                     filter_nodes.remove(node)
                     executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
                     if self.update:
                         break
-                    # sleep(1)
-                # for i in range(1, target_epoch + 1):
-                #     tempR = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == i}
-                #     print(len(tempR), '/', len(self.node_data), '   ', end='')
-                # print(len(filter_nodes))
                 
                 if self.update:
                     print('epoch update')
                     needDo = random.shuffle(filter_nodes.copy())
                     self.update = False
                     continue
+                else:
+                    temp = needDo.copy()
                 
                 result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                 if len(result) == len(self.node_data):
@@ -189,10 +187,6 @@ class Worker:
             history[my_epoch + 1] = new_feature
             
             self.epoch[node] += 1
-            
-            while True:
-                if (sorted(list(self.node_data.get(node, {}).keys()), reverse=True)[0] == my_epoch + 1) and (self.epoch[node] == my_epoch + 1) and (new_feature == self.node_data.get(node, {})[my_epoch + 1]):
-                    break
 
             request_data = {
                 'update_node_epoch': {

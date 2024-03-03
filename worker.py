@@ -41,7 +41,11 @@ class Worker:
         
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
-        return history.get(epoch, NODE_DEFAULT_FEATURE)
+        temp = history.get(epoch, NODE_DEFAULT_FEATURE)
+        # if epoch == 1 and nid in self.node_data.keys() and len(list(self.graph.neighbors(nid))) > 0 and temp == 0:
+        #     with open('return_feature_error', 'a') as f: 
+        #         f.write(nid + " " + str(history) + "\n")
+        return temp
         
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
@@ -65,35 +69,34 @@ class Worker:
                 node_epoch = self.epoch.get(node, self.epoch[nid])
                 if node_epoch < self.epoch[nid]:
                     return None
-                
-                if (int(node) % NUM_PARTITIONS) == self.worker_id:
-                    if j < k - 1:
-                        node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch.get(nid, 0))
-                        node_neighbors_set.update(neighborhood)
-                        sums += node_feature
-                    else:
-                        node_feature = self.node_feature(node, self.epoch.get(nid, 0))
-                        sums += node_feature
-                    random_neighbors.remove(node)
 
-            with ThreadPoolExecutor(max_workers=100) as executor:
+            with ThreadPoolExecutor() as executor:
                 future_to_node = {}
                 for node in random_neighbors:
-                    if j < k - 1:
-                        request_data = {
-                            'feature_and_neighborhood' : {
-                                'nid' : node,
-                                'delta' : deltas[j + 1],
+                    if (int(node) % NUM_PARTITIONS) == self.worker_id:
+                        if j < k - 1:
+                            node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch.get(nid, 0))
+                            node_neighbors_set.update(neighborhood)
+                            sums += node_feature
+                        else:
+                            node_feature = self.node_feature(node, self.epoch.get(nid, 0))
+                            sums += node_feature
+                    else:        
+                        if j < k - 1:
+                            request_data = {
+                                'feature_and_neighborhood' : {
+                                    'nid' : node,
+                                    'delta' : deltas[j + 1],
+                                    'epoch' : self.epoch.get(nid, 0)
+                                }
+                            }
+                        else:
+                            request_data = {
+                                'node_feature' : node,
                                 'epoch' : self.epoch.get(nid, 0)
                             }
-                        }
-                    else:
-                        request_data = {
-                            'node_feature' : node,
-                            'epoch' : self.epoch.get(nid, 0)
-                        }
-                    future = executor.submit(self.send_message, node, json.dumps(request_data))
-                    future_to_node[future] = node
+                        future = executor.submit(self.send_message, node, json.dumps(request_data))
+                        future_to_node[future] = node
                 
                 for future in as_completed(future_to_node):
                     node = future_to_node[future]
@@ -102,11 +105,16 @@ class Worker:
                         result = json.loads(response)
                         if j < k - 1:
                             node_neighbors_set.update(result['neighborhood'])
+
+                        # if self.epoch[nid] == 1 and result['node_feature'] != result_syn_1_1_5000.get(node, 0):
+                        #     with open('read_feature_error', 'a') as f: 
+                        #         f.write(str(self.worker_id) + " " + nid + " " + node + " " + str(self.epoch.get(node, self.epoch[nid])) + " " + str(result['node_feature']) + " " + str(result_syn_1_1_5000.get(node, 0)) + "\n")
+
                         sums += result['node_feature']
                     except Exception as exc:
                         print(f"khop_neighborhood generated an exception: {exc}")
-                        with open('error', 'a') as f: 
-                            f.write("nkhop_neighborhood generated an exception")
+                        # with open('error', 'a') as f: 
+                        #     f.write("nkhop_neighborhood generated an exception")
         
         return sums
     
@@ -120,7 +128,7 @@ class Worker:
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         filter_nodes = self.filter_nodes(target_epoch)
         needDo = filter_nodes.copy()
-        with ThreadPoolExecutor(max_workers=100) as executor:
+        with ThreadPoolExecutor() as executor:
             while True:
                 for node in needDo: 
                     needDo.remove(node)
@@ -149,7 +157,7 @@ class Worker:
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
-    def update_node_epoch_sync(self, node, target_epoch, k, deltas):
+    def update_node_epoch_sync(self, node, k, deltas):
         new_feature = self.khop_neighborhood(node, k, deltas)
         
         history = self.node_data.get(node, {})
@@ -173,12 +181,14 @@ class Worker:
     
     def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
         new_feature = self.khop_neighborhood(node, k, deltas)
+
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
             history[my_epoch + 1] = new_feature
 
             self.epoch[node] += 1
+
             if self.epoch[node] < target_epoch:
                 needDo.append(node)
                 filter_nodes.append(node)
@@ -191,7 +201,7 @@ class Worker:
             }
             request_json = json.dumps(request_data)
 
-            with ThreadPoolExecutor(max_workers=2) as executor1:
+            with ThreadPoolExecutor() as executor1:
                 for server in range(4):
                     if server != self.worker_id:
                         executor1.submit(self.send_message, server, request_json)
@@ -218,8 +228,8 @@ class Worker:
             except Exception as e:
                 # print(e)
                 # print("!!!!!!RPC exception!!!!!!, retrying...")
-                with open('error', 'a') as f:  
-                    f.write(message)
+                # with open('error', 'a') as f:  
+                #     f.write(message)
                 continue
 
 # TODO: improve: rpc call different methods
@@ -234,9 +244,9 @@ class Worker:
             if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                 response = self.send_message(nid, message)
                 return response
-            
+
             request_data = {
-                'node_feature' : self.node_feature(nid, epoch), 
+                'node_feature' : self.node_feature(nid, epoch)
             }
             
         elif 'khop_neighborhood' in request_data:
@@ -251,7 +261,7 @@ class Worker:
             sums = self.khop_neighborhood(nid, k, deltas)
             
             request_data = {
-                'node_feature' : sums if sums is not None else 'Not available.', 
+                'node_feature' : sums if sums is not None else 'Not available.'
             }
             
         elif 'feature_and_neighborhood' in request_data:
@@ -325,8 +335,8 @@ class Worker:
                         epoch_dict.update(request_data['graph_weight_async'])
                     except Exception as exc:
                         print(f"neighborhood_aggregation generated an exception: {exc}")
-                        with open('error', 'a') as f:  
-                                f.write("neighborhood_aggregation generated an exception")
+                        # with open('error', 'a') as f:  
+                        #         f.write("neighborhood_aggregation generated an exception")
             
             request_data = {
                 'epoch_dict' : epoch_dict

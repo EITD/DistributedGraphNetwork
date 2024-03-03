@@ -9,7 +9,7 @@ import sys
 import concurrent.futures
 
 NUM_PARTITIONS = 4
-NODE_FEATURES = "./data/node_features_dummy.txt"
+NODE_FEATURES = "./data/node_features.txt"
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -22,6 +22,7 @@ class Worker:
     # acc = 0
     epoch = {}
     # graph_weight = {0:0}
+    update = False
 
     def __init__(self, wid, portList):
         self.worker_id = int(wid)
@@ -117,36 +118,45 @@ class Worker:
     
     def aggregate_neighborhood(self, target_epoch):
         filter_nodes = self.filter_nodes(target_epoch)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2000) as executor:
-            while filter_nodes:
-                for node in filter_nodes: 
+        needDo = filter_nodes.copy()
+        temp = needDo.copy()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            while True:
+                for node in temp:
+                    needDo.remove(node)
                     filter_nodes.remove(node)
-                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, filter_nodes)
-                # update_node_epoch_thread = threading.Thread(target=self.update_node_epoch_and_wait_for_ack, args=(node, target_epoch, filter_nodes))
-                # update_node_epoch_thread.start()
-                    
+                    executor.submit(self.update_node_epoch_and_wait_for_ack, node, target_epoch, 1, [5000], filter_nodes, needDo)
+                    if self.update:
+                        break
+                
+                if self.update:
+                    print('epoch update')
+                    needDo = random.shuffle(filter_nodes.copy())
+                    self.update = False
+                    continue
+                else:
+                    temp = needDo.copy()
+                
+                result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+                if len(result) == len(self.node_data):
+                    break
+        
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
-    def update_node_epoch_and_wait_for_ack(self, node, target_epoch, filter_nodes):
-        new_feature = self.khop_neighborhood(node, 1, [1])
+    def update_node_epoch_and_wait_for_ack(self, node, target_epoch, k, deltas, filter_nodes, needDo):
+        new_feature = self.khop_neighborhood(node, k, deltas)
+
         if new_feature is not None:
             history = self.node_data.get(node, {})
             my_epoch = sorted(list(history.keys()), reverse=True)[0]
             history[my_epoch + 1] = new_feature
-
-            # if self.graph_weight.get(my_epoch + 1, None) is not None:
-            #     self.graph_weight[my_epoch + 1] += new_feature
-            # else:
-            #     self.graph_weight[my_epoch + 1] = new_feature
-
-            self.epoch[node] += 1
-            if self.epoch[node] < target_epoch:
-                filter_nodes.append(node)
             
+            self.epoch[node] += 1
+
             request_data = {
                 'update_node_epoch': {
                     'nid': node,
@@ -154,8 +164,17 @@ class Worker:
                 }
             }
             request_json = json.dumps(request_data)
-            for server in list(self.s.serverDict.keys()):
-                self.s.tell(node=server, msg=request_json)
+
+            with concurrent.futures.ThreadPoolExecutor() as executor1:
+                for server in range(4):
+                    if server != self.worker_id:
+                        executor1.submit(self.s.tell, server, request_json)
+            
+            if self.epoch[node] < target_epoch:
+                needDo.append(node)
+                filter_nodes.append(node)
+        else:
+            filter_nodes.append(node)
 
             # okDict = {server:False for server in list(self.s.serverDict.keys())}
             # while not all(value for value in okDict.values()):
@@ -255,6 +274,8 @@ class Worker:
                 epoch = request_data['update_node_epoch']['epoch']
 
                 self.epoch[node] = epoch
+                
+                self.update = True
 
                 # request_data = {
                 #     'update_epoch_ack' : "ok"

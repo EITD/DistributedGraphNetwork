@@ -44,22 +44,24 @@ query_khop_neighborhood(3, 1, 5000)
 
 # query_khop_neighborhood(3, 3, [2, 18, 32])
 
-# aggregate_neighborhood(0, 4)
+# aggregate_neighborhood(0, 2)
 
 # epoch = 4
 
-# while True:
-#     if 0 in s.ask_reply_dict:
-#         a = s.ask_reply_dict[0]
-
-#         dic = json.loads(a)['epoch_dict']
-
-#         for key, value in dic.items():
-#                 if (2 ** epoch != value):
-#                         print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
+while True:
+    if 0 in s.ask_reply_dict:
+        a = s.ask_reply_dict[0]
         
-#         with open('check', 'w') as f:
-#             f.write(str(json.loads(a)['epoch_dict']))
-#         break
+        print(a)
+
+        # dic = json.loads(a)['epoch_dict']
+
+        # for key, value in dic.items():
+        #         if (2 ** epoch != value):
+        #                 print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
+        
+        # with open('check', 'w') as f:
+        #     f.write(str(json.loads(a)['epoch_dict']))
+        break
 
 # aggregate_neighborhood(0, 5)

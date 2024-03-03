@@ -21,7 +21,6 @@ def send_message(message):
 
     # train test
     # test_mult_epochs(response, 5)
-    # test_all_neighbors(response, 2) not work
 
 # when node feature all 1(load dummmy), default is 2 ** epoch, multiple epochs, k = 1, deltas = [1]
 def test_mult_epochs(response, epoch):
@@ -31,6 +30,7 @@ def test_mult_epochs(response, epoch):
                     print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
 
 # when node feature all 1(load dummmy), default is 1, epoch = 1, customize k, deltas = [5000, 5000**2...]
+# not work reason: In program, we filter out same neighbors of different nodes; In recursion, we add all duplicate neighbors.
 # def test_all_neighbors(response, k):
 #     data = json.loads(response)['epoch_dict']
 #     for key, value in data.items():
@@ -101,11 +101,11 @@ def train_asynchronize(epochs, k, deltas):
 
 # query_node_feature(1)
 
-# query_khop_neighborhood(4031, 2, [5000, 5000**2])
+query_khop_neighborhood(8, 2, [5000, 5000**2])
 
 # query_khop_neighborhood(3, 3, [2, 18, 32])
     
-query_khop_neighborhood(0, 1, 5000)
+# query_khop_neighborhood(0, 1, 5000)
 
 # train_synchronize(2, 1, 5000)
 

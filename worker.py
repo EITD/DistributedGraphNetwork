@@ -4,29 +4,27 @@ from multiprocessing import Process
 import threading
 from ConvertFile import ConvertFile, nx
 import json
-from MySocket import MySocket
 import sys
 import concurrent.futures
 
 NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
+host = 'localhost'
+testIp = host
+serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
         pass
 class Worker:
     worker_id = None
-    s = None
     node_data = {}
     graph = {}
-    # acc = 0
     epoch = {}
-    # graph_weight = {0:0}
     update = False
 
-    def __init__(self, wid, portList):
+    def __init__(self, wid):
         self.worker_id = int(wid)
-        self.s = MySocket(myNode=wid, port=portList, NUM_PARTITIONS=NUM_PARTITIONS)
 
     def load_node_data(self):
         with open(NODE_FEATURES, 'r') as file:
@@ -43,7 +41,7 @@ class Worker:
         
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
-        return history.get(epoch, 2 ** epoch)
+        return history.get(epoch, 0)
         
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
@@ -55,64 +53,75 @@ class Worker:
     
     def khop_neighborhood(self, nid, k, deltas):
         sums = self.node_feature(nid, self.epoch[nid])
-        node_neighbors_set = set()
+        
         if nid in self.node_data.keys():
             node_neighbors_set = set(self.graph.neighbors(nid))
+        else:
+            return sums
         
         for j in range(k): # [2,3,2]
             random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
             
-            inMyself = []
             for node in random_neighbors:
                 node_epoch = self.epoch.get(node, self.epoch[nid])
                 if node_epoch < self.epoch[nid]:
                     return None
-                
-                if (int(node) % NUM_PARTITIONS) == self.worker_id:
-                    inMyself.append(node)
-                else:
+            
+            feature_and_neighborhood_list = []
+            only_node_feature_list = []
+            feature_and_neighborhood_list_ask = []
+            only_node_feature_list_ask = []
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for node in random_neighbors:
                     if j < k - 1:
-                        request_data = {
-                            'feature_and_neighborhood' : {
-                                'nid' : node,
-                                'delta' : deltas[j + 1],
+                        if (int(node) % NUM_PARTITIONS) == self.worker_id:
+                            print(f'!!!self get: {node}!!!')
+                            future = executor.submit(self.feature_and_neighborhood, node, deltas[j + 1], self.epoch[nid])
+                            feature_and_neighborhood_list.append(future)
+                        else:
+                            request_data = {
+                                'feature_and_neighborhood' : {
+                                    'nid' : node,
+                                    'delta' : deltas[j + 1],
+                                    'epoch' : self.epoch[nid]
+                                }
+                            }
+                            request_json = json.dumps(request_data)
+                            future = executor.submit(ask, node, request_json)
+                            feature_and_neighborhood_list_ask.append(future)
+                    else:
+                        if (int(node) % NUM_PARTITIONS) == self.worker_id:
+                            future = executor.submit(self.node_feature, node, self.epoch[nid])
+                            only_node_feature_list.append(future)
+                        else:
+                            request_data = {
+                                'node_feature' : node,
                                 'epoch' : self.epoch[nid]
                             }
-                        }
-                    else:
-                        request_data = {
-                            'node_feature' : node,
-                            'epoch' : self.epoch[nid]
-                        }
-                    request_json = json.dumps(request_data)
-                    self.s.ask(threading.current_thread().name + node, node, request_json)
+                            request_json = json.dumps(request_data)
+                            future = executor.submit(ask, node, request_json)
+                            only_node_feature_list_ask.append(future)
 
-            random_neighbors = [node for node in random_neighbors if node not in inMyself]
-            okDict = {node:False for node in random_neighbors}
             node_neighbors_set = set()
             
-            for node in inMyself:
-                print(f'!!!self get: {node}!!!')
-                if j < k - 1:
-                    node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch[nid])
-                    node_neighbors_set.update(neighborhood)
-                    sums += node_feature
-                else:
-                    node_feature = self.node_feature(node, self.epoch[nid])
-                    sums += node_feature
-            
-            while not all(value for value in okDict.values()):
-                for node in random_neighbors:
-                    if threading.current_thread().name + node in self.s.ask_reply_dict:
-                        request_data = json.loads(self.s.ask_reply_dict.pop(threading.current_thread().name + node))
-                        
-                        if j < k - 1:
-                            node_neighbors_set.update(request_data['neighborhood'])
-                        sums += request_data['node_feature']
-                        
-                        okDict[node] = True
-                        random_neighbors.remove(node)
-                        break
+            for future in feature_and_neighborhood_list:
+                node_feature, neighborhood = future.result()
+                node_neighbors_set.update(neighborhood)
+                sums += node_feature
+            for future in only_node_feature_list:
+                node_feature = future.result()
+                sums += node_feature
+            for future in feature_and_neighborhood_list_ask:
+                data = json.loads(future.result())
+                node_feature = data['node_feature']
+                neighborhood = data['neighborhood']
+                node_neighbors_set.update(neighborhood)
+                sums += node_feature
+            for future in only_node_feature_list_ask:
+                data = json.loads(future.result())
+                node_feature = data['node_feature']
+                sums += node_feature
         
         return sums
     
@@ -176,17 +185,7 @@ class Worker:
         else:
             filter_nodes.append(node)
 
-            # okDict = {server:False for server in list(self.s.serverDict.keys())}
-            # while not all(value for value in okDict.values()):
-            #     for server in list(self.s.serverDict.keys()):
-            #         if threading.current_thread().name + str(server) in self.s.ask_reply_dict:
-            #             message = self.s.ask_reply_dict.pop(threading.current_thread().name + str(server))
-            #             request_data = json.loads(message)
-            #             if request_data['update_epoch_ack'] == "ok":
-            #                 okDict[server] = True
-
-    def handle_msg(self):
-        client_socket, message = self.s.message_get_queue.get()
+    def handle_msg(self, message):
         request_data = json.loads(message)
         
         try:
@@ -277,31 +276,85 @@ class Worker:
                 
                 self.update = True
 
-                # request_data = {
-                #     'update_epoch_ack' : "ok"
-                # }
-                return
+                request_data = 'ok'
             
             request_json = json.dumps(request_data)
         except NodeForOtherWorker:
-            self.s.ask(threading.current_thread().name + nid, node=nid, msg=message)
+            return ask(nid, message)
         
-            while True:
-                if threading.current_thread().name + nid in self.s.ask_reply_dict:
-                    request_json = self.s.ask_reply_dict.pop(threading.current_thread().name + nid)
-                    break
+        return request_json
         
-        self.s.message_send_queue.put((client_socket, request_json))
+def handle_client(client_socket, worker):
+    data = client_socket.recv(20480)
+    print('get msg:', data)
+    
+    if b'__TELL__' not in data:
+        message = worker.handle_msg(data.decode())
+    else:
+        message = worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
+        # client_socket.send('ok'.encode())
+        client_socket.shutdown(socket.SHUT_RDWR)
+        client_socket.close()
+    
+    print('send out:', message)
+    
+    client_socket.send(message.encode())
 
+def ask(node, msg):
+    while True:
+        # client_socket = self.conn_pool.get_conn()
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        try:
+            client_socket.connect(serverDict.get(int(node) % NUM_PARTITIONS))
+            client_socket.send(msg.encode())
+            print('ask:', msg)
+            
+            data = client_socket.recv(102400).decode()
+            
+            print('get reply:', data)
 
-def start_worker(wid, portList):
-    worker = Worker(wid, portList)
+            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.close()
+            
+            return data
+        except (ConnectionRefusedError):
+            print('ask error')
+            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.close()
+            continue
+
+def tell(server, msg):
+    while True:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        try:
+            client_socket.connect(serverDict.get(int(server) % NUM_PARTITIONS))
+            client_socket.send(b'__TELL__'+msg.encode())
+            print('tell:', msg)
+            
+            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.close()
+            break
+        except (ConnectionRefusedError):
+            print('tell error')
+            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.close()
+            continue
+
+def start_worker(wid, port):
+    worker = Worker(wid)
     worker.load_node_data()
     worker.load_graph_dict()
-    while True:
-        if not worker.s.message_get_queue.empty():
-            handle_thread = threading.Thread(target=worker.handle_msg)
-            handle_thread.start()
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    server_socket.bind((host, port))
+    server_socket.listen(30000)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        while True:
+            client_socket, _ = server_socket.accept()
+            executor.submit(handle_client, client_socket, worker)
 
 if __name__ == "__main__":
         # portList = [12345 + sys.argv[1] + (i*4) for i in range(1000)]

@@ -36,8 +36,41 @@ Bonus tasks:
 
 - Start Worker: 
 
+  `python3 worker.py {worker_id}`
+
+## Benchmark
+
+### Line Analysis
+
+- Start Worker: 
+
   `kernprof -l worker.py {worker_id}`
 
-- Benchmark: 
+- Generate Line Analysis File: 
+
+  For each worker, stop and execute `python3 parse_lprof_to_file.py {worker_id}` 
+
+### Memory Analysis
+
+- Start Worker:
+
+  `mprof run --output mprofile{worker_id}.dat worker.py {worker_id}`
+
+- Generate Memory Analysis Graph:
+
+  `mprof plot mprofile{worker_id}.dat --output memory_results{worker_id}.png`
+
+  > Train result may be too big to transfer into graph.
+
+### Performance
+
+> Not very clear, but detail.
+
+- Start Worker:
+
+  `python3 -m cProfile -o performance_results{worker_id}.prof worker.py {worker_id}`
+
+- Generate Performance Report:
+
+  For each worker, stop and execute `snakeviz performance_results{worker_id}.prof`
   
-  For each worker, stop and `python3 parse_lprof_to_file.py {worker_id}`

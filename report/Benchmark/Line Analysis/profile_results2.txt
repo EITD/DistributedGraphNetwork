@@ -1,6 +1,6 @@
 Timer unit: 1e-06 s
 
-Total time: 0.003518 s
+Total time: 0.003404 s
 File: worker.py
 Function: load_node_data at line 35
 
@@ -8,15 +8,15 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
     35                                               @profile
     36                                               def load_node_data(self):
-    37         2         25.0     12.5      0.7          with open(NODE_FEATURES, 'r') as file:
-    38         1        112.0    112.0      3.2              lines = file.readlines()
-    39      3664        528.0      0.1     15.0          for line in lines:
-    40      3663       1129.0      0.3     32.1              parts = line.strip().split()[:2]
-    41      3663        577.0      0.2     16.4              self.epoch[parts[0]] = 0
-    42      3663        871.0      0.2     24.8              if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
-    43       917        276.0      0.3      7.8                  self.node_data[parts[0]] = {0:int(parts[1])}
+    37         2         20.0     10.0      0.6          with open(NODE_FEATURES, 'r') as file:
+    38         1        112.0    112.0      3.3              lines = file.readlines()
+    39      3664        496.0      0.1     14.6          for line in lines:
+    40      3663       1104.0      0.3     32.4              parts = line.strip().split()[:2]
+    41      3663        570.0      0.2     16.7              self.epoch[parts[0]] = 0
+    42      3663        843.0      0.2     24.8              if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
+    43       917        259.0      0.3      7.6                  self.node_data[parts[0]] = {0:int(parts[1])}
 
-Total time: 0.051616 s
+Total time: 0.050416 s
 File: worker.py
 Function: load_graph_dict at line 45
 
@@ -24,9 +24,9 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
     45                                               @profile
     46                                               def load_graph_dict(self):
-    47         1      51616.0  51616.0    100.0          self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
+    47         1      50416.0  50416.0    100.0          self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
 
-Total time: 9.3e-05 s
+Total time: 0.07808 s
 File: worker.py
 Function: node_feature at line 49
 
@@ -34,13 +34,13 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
     49                                               @profile   
     50                                               def node_feature(self, nid, epoch):
-    51        87         44.0      0.5     47.3          history = self.node_data.get(nid, {})
-    52        87         31.0      0.4     33.3          temp = history.get(epoch, NODE_DEFAULT_FEATURE)
+    51     44964      42352.0      0.9     54.2          history = self.node_data.get(nid, {})
+    52     44964      27037.0      0.6     34.6          temp = history.get(epoch, NODE_DEFAULT_FEATURE)
     53                                                   # asy debug: history only contains epoch 0 
     54                                                   # if epoch == 1 and nid in self.node_data.keys() and len(list(self.graph.neighbors(nid))) > 0 and temp == 0:
     55                                                   #     with open('return_feature_error', 'a') as f: 
     56                                                   #         f.write(nid + " " + str(history) + "\n")
-    57        87         18.0      0.2     19.4          return temp
+    57     44964       8691.0      0.2     11.1          return temp
 
 Total time: 0 s
 File: worker.py
@@ -57,7 +57,7 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
     65                                                   
     66                                                   return self.node_feature(nid, epoch), random_neighbors
 
-Total time: 0 s
+Total time: 4752.29 s
 File: worker.py
 Function: khop_neighborhood at line 68
 
@@ -65,33 +65,33 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
     68                                               @profile
     69                                               def khop_neighborhood(self, nid, k, deltas):
-    70                                                   sums = self.node_feature(nid, self.epoch.get(nid, 0))
-    71                                                   node_neighbors_set = set()
-    72                                                   if nid in self.node_data.keys():
-    73                                                       node_neighbors_set = set(self.graph.neighbors(nid))
+    70      2092      12028.0      5.7      0.0          sums = self.node_feature(nid, self.epoch.get(nid, 0))
+    71      2092       1132.0      0.5      0.0          node_neighbors_set = set()
+    72      2092       1933.0      0.9      0.0          if nid in self.node_data.keys():
+    73      2092      10926.0      5.2      0.0              node_neighbors_set = set(self.graph.neighbors(nid))
     74                                                   
-    75                                                   for j in range(k): 
-    76                                                       random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
-    77                                                       node_neighbors_set = set()
+    75      3926       2090.0      0.5      0.0          for j in range(k): 
+    76      2092      66496.0     31.8      0.0              random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
+    77      2092       1600.0      0.8      0.0              node_neighbors_set = set()
     78                                           
-    79                                                       for node in random_neighbors:
-    80                                                           node_epoch = self.epoch.get(node, self.epoch[nid])
-    81                                                           if node_epoch < self.epoch[nid]:
-    82                                                               return None
+    79     44519       7023.0      0.2      0.0              for node in random_neighbors:
+    80     42685      23922.0      0.6      0.0                  node_epoch = self.epoch.get(node, self.epoch[nid])
+    81     42685       9330.0      0.2      0.0                  if node_epoch < self.epoch[nid]:
+    82       258         56.0      0.2      0.0                      return None
     83                                           
-    84                                                       with ThreadPoolExecutor() as executor:
-    85                                                           future_to_node = {}
-    86                                                           for node in random_neighbors:
-    87                                                               if (int(node) % NUM_PARTITIONS) == self.worker_id:
-    88                                                                   if j < k - 1:
+    84      3668    4110644.0   1120.7      0.1              with ThreadPoolExecutor() as executor:
+    85      1834        416.0      0.2      0.0                  future_to_node = {}
+    86     43908      15485.0      0.4      0.0                  for node in random_neighbors:
+    87     42074      30021.0      0.7      0.0                      if (int(node) % NUM_PARTITIONS) == self.worker_id:
+    88     10086       2693.0      0.3      0.0                          if j < k - 1:
     89                                                                       node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch.get(nid, 0))
     90                                                                       node_neighbors_set.update(neighborhood)
     91                                                                       sums += node_feature
     92                                                                   else:
-    93                                                                       node_feature = self.node_feature(node, self.epoch.get(nid, 0))
-    94                                                                       sums += node_feature
+    93     10086      48826.0      4.8      0.0                              node_feature = self.node_feature(node, self.epoch.get(nid, 0))
+    94     10086       2817.0      0.3      0.0                              sums += node_feature
     95                                                               else:        
-    96                                                                   if j < k - 1:
+    96     31988       8157.0      0.3      0.0                          if j < k - 1:
     97                                                                       request_data = {
     98                                                                           'feature_and_neighborhood' : {
     99                                                                               'nid' : node,
@@ -100,29 +100,29 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    102                                                                           }
    103                                                                       }
    104                                                                   else:
-   105                                                                       request_data = {
-   106                                                                           'node_feature' : node,
-   107                                                                           'epoch' : self.epoch.get(nid, 0)
+   105     31988      12918.0      0.4      0.0                              request_data = {
+   106     31988       3933.0      0.1      0.0                                  'node_feature' : node,
+   107     31988      13081.0      0.4      0.0                                  'epoch' : self.epoch.get(nid, 0)
    108                                                                       }
-   109                                                                   future = executor.submit(self.send_message, node, json.dumps(request_data))
-   110                                                                   future_to_node[future] = node
+   109     31988   22909247.0    716.2      0.5                          future = executor.submit(self.send_message, node, json.dumps(request_data))
+   110     31988      14981.0      0.5      0.0                          future_to_node[future] = node
    111                                                           
-   112                                                           for future in as_completed(future_to_node):
-   113                                                               node = future_to_node[future]
-   114                                                               try:
-   115                                                                   response = future.result()
-   116                                                                   result = json.loads(response)
-   117                                                                   if j < k - 1:
+   112     33822 4724613938.0 139690.6     99.4                  for future in as_completed(future_to_node):
+   113     31988      19095.0      0.6      0.0                      node = future_to_node[future]
+   114     31988       4426.0      0.1      0.0                      try:
+   115     31988      95669.0      3.0      0.0                          response = future.result()
+   116     31988     222875.0      7.0      0.0                          result = json.loads(response)
+   117     31988      11627.0      0.4      0.0                          if j < k - 1:
    118                                                                       node_neighbors_set.update(result['neighborhood'])
    119                                                                   # asy debug: node's epoch is 0, which means bug in above return None
    120                                                                   # if self.epoch[nid] == 1 and result['node_feature'] != result_syn_1_1_5000.get(node, 0):
    121                                                                   #     with open('read_feature_error', 'a') as f: 
    122                                                                   #         f.write(str(self.worker_id) + " " + nid + " " + node + " " + str(self.epoch.get(node, self.epoch[nid])) + " " + str(result['node_feature']) + " " + str(result_syn_1_1_5000.get(node, 0)) + "\n")
-   123                                                                   sums += result['node_feature']
+   123     31988      13751.0      0.4      0.0                          sums += result['node_feature']
    124                                                               except Exception as exc:
    125                                                                   print(f"khop_neighborhood generated an exception: {exc}")
    126                                           
-   127                                                   return sums
+   127      1834        428.0      0.2      0.0          return sums
 
 Total time: 0 s
 File: worker.py
@@ -138,7 +138,7 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    134                                                           
    135                                                   return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
 
-Total time: 0 s
+Total time: 491.874 s
 File: worker.py
 Function: aggregate_neighborhood_async at line 137
 
@@ -146,33 +146,33 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
    137                                               @profile
    138                                               def aggregate_neighborhood_async(self, target_epoch, k, deltas):
-   139                                                   filter_nodes = self.filter_nodes(target_epoch)
-   140                                                   needDo = filter_nodes.copy()
-   141                                                   temp = needDo.copy()
-   142                                                   with ThreadPoolExecutor() as executor:
-   143                                                       while True:
-   144                                                           for node in temp:
-   145                                                               needDo.remove(node)
-   146                                                               filter_nodes.remove(node)
-   147                                                               executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
-   148                                                               if self.update:
-   149                                                                   break
+   139        64      26757.0    418.1      0.0          filter_nodes = self.filter_nodes(target_epoch)
+   140        64        106.0      1.7      0.0          needDo = filter_nodes.copy()
+   141        64        102.0      1.6      0.0          temp = needDo.copy()
+   142       128  490527119.0    4e+06     99.7          with ThreadPoolExecutor() as executor:
+   143      2943        550.0      0.2      0.0              while True:
+   144      4975        907.0      0.2      0.0                  for node in temp:
+   145      2152        997.0      0.5      0.0                      needDo.remove(node)
+   146      2092        587.0      0.3      0.0                      filter_nodes.remove(node)
+   147      2092     404621.0    193.4      0.1                      executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
+   148      2092       1658.0      0.8      0.0                      if self.update:
+   149        60         15.0      0.2      0.0                          break
    150                                                           
-   151                                                           if self.update:
-   152                                                               print('epoch update')
-   153                                                               needDo = random.shuffle(filter_nodes.copy())
-   154                                                               self.update = False
-   155                                                               continue
+   151      2883        545.0      0.2      0.0                  if self.update:
+   152        63      52374.0    831.3      0.0                      print('epoch update')
+   153        63      42745.0    678.5      0.0                      needDo = random.shuffle(filter_nodes.copy())
+   154        63         37.0      0.6      0.0                      self.update = False
+   155        63         19.0      0.3      0.0                      continue
    156                                                           else:
-   157                                                               temp = needDo.copy()
+   157      2820       2406.0      0.9      0.0                      temp = needDo.copy()
    158                                                           
-   159                                                           result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-   160                                                           if len(result) == len(self.node_data):
-   161                                                               break
+   159      2817     811344.0    288.0      0.2                  result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+   160      2817        943.0      0.3      0.0                  if len(result) == len(self.node_data):
+   161         1          0.0      0.0      0.0                      break
    162                                                   
-   163                                                   return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+   163         1        404.0    404.0      0.0          return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
 
-Total time: 0 s
+Total time: 0.026445 s
 File: worker.py
 Function: filter_nodes at line 165
 
@@ -180,7 +180,7 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
    165                                               @profile
    166                                               def filter_nodes(self, target_epoch):
-   167                                                   return [node for node in list(self.node_data.keys())
+   167        64      26445.0    413.2    100.0          return [node for node in list(self.node_data.keys())
    168                                                           if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
 
 Total time: 0 s
@@ -212,7 +212,7 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    190                                                           if server != self.worker_id:
    191                                                               executor.submit(self.send_message, server, request_json)
 
-Total time: 0 s
+Total time: 6053.68 s
 File: worker.py
 Function: update_node_epoch_async at line 193
 
@@ -220,35 +220,35 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
    193                                               @profile
    194                                               def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
-   195                                                   new_feature = self.khop_neighborhood(node, k, deltas)
+   195      2092 4752581079.0    2e+06     78.5          new_feature = self.khop_neighborhood(node, k, deltas)
    196                                           
-   197                                                   if new_feature is not None:
-   198                                                       history = self.node_data.get(node, {})
-   199                                                       my_epoch = sorted(list(history.keys()), reverse=True)[0]
-   200                                                       history[my_epoch + 1] = new_feature
+   197      2092        577.0      0.3      0.0          if new_feature is not None:
+   198      1834       2076.0      1.1      0.0              history = self.node_data.get(node, {})
+   199      1834       6072.0      3.3      0.0              my_epoch = sorted(list(history.keys()), reverse=True)[0]
+   200      1834        955.0      0.5      0.0              history[my_epoch + 1] = new_feature
    201                                                       
-   202                                                       self.epoch[node] += 1
+   202      1834       1816.0      1.0      0.0              self.epoch[node] += 1
    203                                           
-   204                                                       request_data = {
-   205                                                           'update_node_epoch': {
-   206                                                               'nid': node,
-   207                                                               'epoch': self.epoch[node]
+   204      1834        535.0      0.3      0.0              request_data = {
+   205      3668       1440.0      0.4      0.0                  'update_node_epoch': {
+   206      1834        254.0      0.1      0.0                      'nid': node,
+   207      1834        392.0      0.2      0.0                      'epoch': self.epoch[node]
    208                                                           }
    209                                                       }
-   210                                                       request_json = json.dumps(request_data)
+   210      1834      23437.0     12.8      0.0              request_json = json.dumps(request_data)
    211                                           
-   212                                                       with ThreadPoolExecutor() as executor1:
-   213                                                           for server in range(4):
-   214                                                               if server != self.worker_id:
-   215                                                                   executor1.submit(self.send_message, server, request_json)
+   212      3668 1296720408.0 353522.5     21.4              with ThreadPoolExecutor() as executor1:
+   213      9170       5792.0      0.6      0.0                  for server in range(4):
+   214      7336       3462.0      0.5      0.0                      if server != self.worker_id:
+   215      5502    4326642.0    786.4      0.1                          executor1.submit(self.send_message, server, request_json)
    216                                                       
-   217                                                       if self.epoch[node] < target_epoch:
-   218                                                           needDo.append(node)
-   219                                                           filter_nodes.append(node)
+   217      1834       2235.0      1.2      0.0              if self.epoch[node] < target_epoch:
+   218       917        557.0      0.6      0.0                  needDo.append(node)
+   219       917        453.0      0.5      0.0                  filter_nodes.append(node)
    220                                                   else:
-   221                                                       filter_nodes.append(node)
+   221       258        102.0      0.4      0.0              filter_nodes.append(node)
 
-Total time: 0 s
+Total time: 14458.3 s
 File: worker.py
 Function: send_message at line 231
 
@@ -256,20 +256,20 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
    231                                               @profile
    232                                               def send_message(self, node, message):
-   233                                                   print("Send message: ", message)
-   234                                                   while True:
-   235                                                       try:
-   236                                                           port = 12345 + int(node) % NUM_PARTITIONS
-   237                                                           proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
-   238                                                           response = proxy.handle_msg(message)
-   239                                                           print("Received response message: ", response)
-   240                                                           return response
-   241                                                       except Exception as e:
+   233     37490  242516248.0   6468.8      1.7          print("Send message: ", message)
+   234     37780      13252.0      0.4      0.0          while True:
+   235     37780       6129.0      0.2      0.0              try:
+   236     37780      39706.0      1.1      0.0                  port = 12345 + int(node) % NUM_PARTITIONS
+   237     37780     512290.0     13.6      0.0                  proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
+   238     37780        1e+10 368943.1     96.4                  response = proxy.handle_msg(message)
+   239     37490  276574766.0   7377.3      1.9                  print("Received response message: ", response)
+   240     37490      13192.0      0.4      0.0                  return response
+   241       290        273.0      0.9      0.0              except Exception as e:
    242                                                           # print(e)
    243                                                           # print("!!!!!!RPC exception!!!!!!, retrying...")
-   244                                                           continue
+   244       290       1388.0      4.8      0.0                  continue
 
-Total time: 0.004506 s
+Total time: 717.279 s
 File: worker.py
 Function: handle_msg at line 247
 
@@ -277,22 +277,22 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
    247                                               @profile
    248                                               def handle_msg(self, message):
-   249        87       1763.0     20.3     39.1          print("Received handle message: ", message)
-   250        87        526.0      6.0     11.7          request_data = json.loads(message)
+   249     38342  147149775.0   3837.8     20.5          print("Received handle message: ", message)
+   250     38342     356180.0      9.3      0.0          request_data = json.loads(message)
    251                                                   
-   252        87         53.0      0.6      1.2          if 'node_feature' in request_data:
-   253        87         22.0      0.3      0.5              nid = request_data['node_feature']
-   254        87        120.0      1.4      2.7              epoch = int(request_data.get('epoch', self.epoch.get(nid, 0)))
+   252     38342      13301.0      0.3      0.0          if 'node_feature' in request_data:
+   253     32786      10362.0      0.3      0.0              nid = request_data['node_feature']
+   254     32786      54676.0      1.7      0.0              epoch = int(request_data.get('epoch', self.epoch.get(nid, 0)))
    255                                           
-   256        87         42.0      0.5      0.9              if (int(nid) % NUM_PARTITIONS) != self.worker_id:
+   256     32786      25921.0      0.8      0.0              if (int(nid) % NUM_PARTITIONS) != self.worker_id:
    257                                                           response = self.send_message(nid, message)
    258                                                           return response
    259                                           
-   260        87         31.0      0.4      0.7              request_data = {
-   261        87        338.0      3.9      7.5                  'node_feature' : self.node_feature(nid, epoch)
+   260     32786      13522.0      0.4      0.0              request_data = {
+   261     32786     191480.0      5.8      0.0                  'node_feature' : self.node_feature(nid, epoch)
    262                                                       }
    263                                                       
-   264                                                   elif 'khop_neighborhood' in request_data:
+   264      5556       1702.0      0.3      0.0          elif 'khop_neighborhood' in request_data:
    265                                                       nid = request_data['khop_neighborhood']['nid']
    266                                                       k = request_data['khop_neighborhood']['k']
    267                                                       deltas = request_data['khop_neighborhood']['deltas']
@@ -307,7 +307,7 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    276                                                           'node_feature' : sums if sums is not None else 'Not available.'
    277                                                       }
    278                                                       
-   279                                                   elif 'feature_and_neighborhood' in request_data:
+   279      5556       1860.0      0.3      0.0          elif 'feature_and_neighborhood' in request_data:
    280                                                       nid = request_data['feature_and_neighborhood']['nid']
    281                                                       delta = request_data['feature_and_neighborhood']['delta']
    282                                                       epoch = request_data['feature_and_neighborhood']['epoch']
@@ -322,7 +322,7 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    291                                                           'neighborhood' : neighborhoodSet 
    292                                                       }
    293                                                   
-   294                                                   elif 'neighborhood_aggregation_sync' in request_data:
+   294      5556       1902.0      0.3      0.0          elif 'neighborhood_aggregation_sync' in request_data:
    295                                                       final_epoch = request_data['neighborhood_aggregation_sync']['epochs']
    296                                                       k = request_data['neighborhood_aggregation_sync']['k']
    297                                                       deltas = request_data['neighborhood_aggregation_sync']['deltas']
@@ -354,7 +354,7 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    323                                                           'epoch_dict' : epoch_dict
    324                                                       }
    325                                           
-   326                                                   elif 'neighborhood_aggregation_async' in request_data:
+   326      5556       1775.0      0.3      0.0          elif 'neighborhood_aggregation_async' in request_data:
    327                                                       final_epoch = request_data['neighborhood_aggregation_async']['epochs']
    328                                                       k = request_data['neighborhood_aggregation_async']['k']
    329                                                       deltas = request_data['neighborhood_aggregation_async']['deltas']
@@ -383,7 +383,7 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    352                                                           'epoch_dict' : epoch_dict
    353                                                       }    
    354                                                               
-   355                                                   elif 'graph_weight_sync' in request_data:
+   355      5556       1295.0      0.2      0.0          elif 'graph_weight_sync' in request_data:
    356                                                       target_epoch = request_data['graph_weight_sync']['target_epoch']
    357                                                       k = request_data['graph_weight_sync']['k']
    358                                                       deltas = request_data['graph_weight_sync']['deltas']
@@ -397,32 +397,32 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    366                                                               'graph_weight_sync' : self.aggregate_neighborhood_sync(target_epoch, k, deltas)
    367                                                           }
    368                                                   
-   369                                                   elif 'graph_weight_async' in request_data:
-   370                                                       target_epoch = request_data['graph_weight_async']['target_epoch']
-   371                                                       k = request_data['graph_weight_async']['k']
-   372                                                       deltas = request_data['graph_weight_async']['deltas']
+   369      5556       1780.0      0.3      0.0          elif 'graph_weight_async' in request_data:
+   370        64         54.0      0.8      0.0              target_epoch = request_data['graph_weight_async']['target_epoch']
+   371        64         18.0      0.3      0.0              k = request_data['graph_weight_async']['k']
+   372        64         45.0      0.7      0.0              deltas = request_data['graph_weight_async']['deltas']
    373                                           
-   374                                                       if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
+   374        64       2820.0     44.1      0.0              if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
    375                                                           request_data = {
    376                                                               'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
    377                                                           } 
    378                                                       else:
-   379                                                           request_data = {
-   380                                                               'graph_weight_async' : self.aggregate_neighborhood_async(target_epoch, k, deltas)
+   379         1          1.0      1.0      0.0                  request_data = {
+   380        64  491880449.0    8e+06     68.6                      'graph_weight_async' : self.aggregate_neighborhood_async(target_epoch, k, deltas)
    381                                                           }
    382                                           
-   383                                                   elif 'update_node_epoch' in request_data:
-   384                                                       node = request_data['update_node_epoch']['nid']
-   385                                                       epoch = request_data['update_node_epoch']['epoch']
+   383      5492       1589.0      0.3      0.0          elif 'update_node_epoch' in request_data:
+   384      5492       2459.0      0.4      0.0              node = request_data['update_node_epoch']['nid']
+   385      5492       2016.0      0.4      0.0              epoch = request_data['update_node_epoch']['epoch']
    386                                           
-   387                                                       self.epoch[node] = epoch
+   387      5492       6547.0      1.2      0.0              self.epoch[node] = epoch
    388                                                       
-   389                                                       self.update = True
+   389      5492       2230.0      0.4      0.0              self.update = True
    390                                           
-   391                                                       return 'ok'
+   391      5492       1325.0      0.2      0.0              return 'ok'
    392                                                   
-   393        87        598.0      6.9     13.3          request_json = json.dumps(request_data)
+   393     32787     329881.0     10.1      0.0          request_json = json.dumps(request_data)
    394                                                   
-   395        87       1000.0     11.5     22.2          print('reply:', request_json)
-   396        87         13.0      0.1      0.3          return request_json
+   395     32787   77215306.0   2355.1     10.8          print('reply:', request_json)
+   396     32787       8437.0      0.3      0.0          return request_json
 

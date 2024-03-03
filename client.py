@@ -18,12 +18,12 @@ def send_message(message):
     print("duration: ", end_time - start_time)
     
     # long response write into file
-    with open('check', 'w') as f: 
-        f.write(str(json.loads(response)['epoch_dict'])) 
+    # with open('check', 'w') as f: 
+    #     f.write(str(json.loads(response)['epoch_dict'])) 
 
     # train test
-    # test_mult_epochs(response, epoch)
-    # test_all_neighbors(response, k)
+    # test_mult_epochs(response, 5)
+    # test_all_neighbors(response, 2)
 
 # when node feature all 1(load dummmy), default is 2 ** epoch, multiple epochs, k = 1, deltas = [1]
 def test_mult_epochs(response, epoch):
@@ -33,24 +33,24 @@ def test_mult_epochs(response, epoch):
                     print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
 
 # when node feature all 1(load dummmy), default is 1, epoch = 1, customize k, deltas = [5000, 5000**2...]
-def test_all_neighbors(response, k):
-    data = json.loads(response)['epoch_dict']
-    for key, value in data.items():
-        sums = 1
-        neighborsList = list(all_graph.neighbors(key))
-        sums += len(neighborsList)
-        if k > 1:
-            sums += recursion(k - 1, neighborsList)
-        if sums != value:
-            print("Warning:", key, 'value:', value, 'should be:', sums)
+# def test_all_neighbors(response, k):
+#     data = json.loads(response)['epoch_dict']
+#     for key, value in data.items():
+#         sums = 1
+#         neighborsList = list(all_graph.neighbors(key))
+#         sums += len(neighborsList)
+#         if k > 1:
+#             sums += recursion(k - 1, neighborsList)
+#         if sums != value:
+#             print("Warning:", key, 'value:', value, 'should be:', sums)
 
-def recursion(k, neighborsList):
-    sums = 0
-    for n in neighborsList:
-        temp = list(all_graph.neighbors(n))
-        sums += len(temp)
-        if k != 1: sums += recursion(k-1, temp)
-    return sums
+# def recursion(k, neighborsList):
+#     sums = 0
+#     for n in neighborsList:
+#         temp = list(all_graph.neighbors(n))
+#         sums += len(temp)
+#         if k != 1: sums += recursion(k-1, temp)
+#     return sums
 
 
 def query_node_feature(nid):
@@ -112,6 +112,6 @@ def train_asynchronize(epochs, k, deltas):
 
 # train_synchronize(2, 1, 5000)
 
-train_asynchronize(2, 1, 5000)
-    
-# train_asynchronize(1, 2, [5000, 5000**2])
+# train_asynchronize(2, 1, 5000)
+
+# train_asynchronize(5, 1, 1)

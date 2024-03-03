@@ -42,6 +42,7 @@ class Worker:
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
         temp = history.get(epoch, NODE_DEFAULT_FEATURE)
+        # asy debug: history only contains epoch 0 
         # if epoch == 1 and nid in self.node_data.keys() and len(list(self.graph.neighbors(nid))) > 0 and temp == 0:
         #     with open('return_feature_error', 'a') as f: 
         #         f.write(nid + " " + str(history) + "\n")
@@ -105,23 +106,20 @@ class Worker:
                         result = json.loads(response)
                         if j < k - 1:
                             node_neighbors_set.update(result['neighborhood'])
-
+                        # asy debug: node's epoch is 0, which means bug in above return None
                         # if self.epoch[nid] == 1 and result['node_feature'] != result_syn_1_1_5000.get(node, 0):
                         #     with open('read_feature_error', 'a') as f: 
                         #         f.write(str(self.worker_id) + " " + nid + " " + node + " " + str(self.epoch.get(node, self.epoch[nid])) + " " + str(result['node_feature']) + " " + str(result_syn_1_1_5000.get(node, 0)) + "\n")
-
                         sums += result['node_feature']
                     except Exception as exc:
                         print(f"khop_neighborhood generated an exception: {exc}")
-                        # with open('error', 'a') as f: 
-                        #     f.write("nkhop_neighborhood generated an exception")
-        
+
         return sums
     
     def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
         with ThreadPoolExecutor() as executor:
             for node in list(self.node_data.keys()):
-                executor.submit(self.update_node_epoch_sync, node, target_epoch, k, deltas)
+                executor.submit(self.update_node_epoch_sync, node, k, deltas)
                 
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     
@@ -227,8 +225,6 @@ class Worker:
             except Exception as e:
                 # print(e)
                 # print("!!!!!!RPC exception!!!!!!, retrying...")
-                # with open('error', 'a') as f:  
-                #     f.write(message)
                 continue
 
 # TODO: improve: rpc call different methods
@@ -325,7 +321,6 @@ class Worker:
             request_json = json.dumps(request_data)
 
             epoch_dict = {}
-            # datas = {}
             with ThreadPoolExecutor() as executor:
                 futures = {executor.submit(self.send_message, server, request_json): server for server in range(4)}
                 for future in as_completed(futures):
@@ -333,15 +328,11 @@ class Worker:
                         response = future.result()
                         request_data = json.loads(response)
                         epoch_dict.update(request_data['graph_weight_async'])
-                        # datas.update(request_data['node_data'])
                     except Exception as exc:
                         print(f"neighborhood_aggregation generated an exception: {exc}")
-                        # with open('error', 'a') as f:  
-                        #         f.write("neighborhood_aggregation generated an exception")
-            
+
             request_data = {
                 'epoch_dict' : epoch_dict
-                # 'datas': datas
             }    
                     
         elif 'graph_weight_sync' in request_data:
@@ -366,12 +357,10 @@ class Worker:
             if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
                 request_data = {
                     'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-                    # 'node_data':self.node_data.items()
                 } 
             else:
                 request_data = {
                     'graph_weight_async' : self.aggregate_neighborhood_async(target_epoch, k, deltas)
-                    # 'node_data':self.node_data.items()
                 }
 
         elif 'update_node_epoch' in request_data:

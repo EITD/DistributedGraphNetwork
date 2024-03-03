@@ -1,3 +1,5 @@
+# This version removes node in 'for' loop, which causes inaccurate index in the loop and return inaccurate khop result.
+
 import random
 from time import sleep
 from ConvertFile import ConvertFile

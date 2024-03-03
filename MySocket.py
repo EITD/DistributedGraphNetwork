@@ -58,7 +58,7 @@ class MySocket:
             self.serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
             
         if client:
-            self.serverDict = {-1:(testIp,12346)}
+            self.serverDict = {-1:(testIp,12345)}
         
         # if not client:
         #     self.serverDict[myNode] = (host, port)
@@ -197,8 +197,8 @@ class MySocket:
                     print(mid, 'duration:', duration)
                 else:
                     print('get reply:', data)
-                # self.ask_reply_dict[mid] = data
-                self.ask_reply_dict[mid] = (start, end)
+                self.ask_reply_dict[mid] = data
+                # self.ask_reply_dict[mid] = (start, end)
 
                 self.conn_pool.release_conn(client_socket)
                 # client_socket.shutdown(socket.SHUT_RDWR)

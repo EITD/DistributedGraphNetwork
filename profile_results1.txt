@@ -1,0 +1,428 @@
+Timer unit: 1e-06 s
+
+Total time: 0.003511 s
+File: worker.py
+Function: load_node_data at line 35
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    35                                               @profile
+    36                                               def load_node_data(self):
+    37         2         20.0     10.0      0.6          with open(NODE_FEATURES, 'r') as file:
+    38         1        114.0    114.0      3.2              lines = file.readlines()
+    39      3664        485.0      0.1     13.8          for line in lines:
+    40      3663       1192.0      0.3     34.0              parts = line.strip().split()[:2]
+    41      3663        562.0      0.2     16.0              self.epoch[parts[0]] = 0
+    42      3663        846.0      0.2     24.1              if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
+    43       919        292.0      0.3      8.3                  self.node_data[parts[0]] = {0:int(parts[1])}
+
+Total time: 0.051099 s
+File: worker.py
+Function: load_graph_dict at line 45
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    45                                               @profile
+    46                                               def load_graph_dict(self):
+    47         1      51099.0  51099.0    100.0          self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
+
+Total time: 0.000107 s
+File: worker.py
+Function: node_feature at line 49
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    49                                               @profile   
+    50                                               def node_feature(self, nid, epoch):
+    51        87         58.0      0.7     54.2          history = self.node_data.get(nid, {})
+    52        87         27.0      0.3     25.2          temp = history.get(epoch, NODE_DEFAULT_FEATURE)
+    53                                                   # asy debug: history only contains epoch 0 
+    54                                                   # if epoch == 1 and nid in self.node_data.keys() and len(list(self.graph.neighbors(nid))) > 0 and temp == 0:
+    55                                                   #     with open('return_feature_error', 'a') as f: 
+    56                                                   #         f.write(nid + " " + str(history) + "\n")
+    57        87         22.0      0.3     20.6          return temp
+
+Total time: 0 s
+File: worker.py
+Function: feature_and_neighborhood at line 59
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    59                                               @profile    
+    60                                               def feature_and_neighborhood(self, nid, delta, epoch):
+    61                                                   node_neighbors_list = list()
+    62                                                   if nid in self.node_data.keys():
+    63                                                       node_neighbors_list = list(self.graph.neighbors(nid))
+    64                                                   random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
+    65                                                   
+    66                                                   return self.node_feature(nid, epoch), random_neighbors
+
+Total time: 0 s
+File: worker.py
+Function: khop_neighborhood at line 68
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    68                                               @profile
+    69                                               def khop_neighborhood(self, nid, k, deltas):
+    70                                                   sums = self.node_feature(nid, self.epoch.get(nid, 0))
+    71                                                   node_neighbors_set = set()
+    72                                                   if nid in self.node_data.keys():
+    73                                                       node_neighbors_set = set(self.graph.neighbors(nid))
+    74                                                   
+    75                                                   for j in range(k): 
+    76                                                       random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
+    77                                                       node_neighbors_set = set()
+    78                                           
+    79                                                       for node in random_neighbors:
+    80                                                           node_epoch = self.epoch.get(node, self.epoch[nid])
+    81                                                           if node_epoch < self.epoch[nid]:
+    82                                                               return None
+    83                                           
+    84                                                       with ThreadPoolExecutor() as executor:
+    85                                                           future_to_node = {}
+    86                                                           for node in random_neighbors:
+    87                                                               if (int(node) % NUM_PARTITIONS) == self.worker_id:
+    88                                                                   if j < k - 1:
+    89                                                                       node_feature, neighborhood = self.feature_and_neighborhood(node, deltas[j + 1], self.epoch.get(nid, 0))
+    90                                                                       node_neighbors_set.update(neighborhood)
+    91                                                                       sums += node_feature
+    92                                                                   else:
+    93                                                                       node_feature = self.node_feature(node, self.epoch.get(nid, 0))
+    94                                                                       sums += node_feature
+    95                                                               else:        
+    96                                                                   if j < k - 1:
+    97                                                                       request_data = {
+    98                                                                           'feature_and_neighborhood' : {
+    99                                                                               'nid' : node,
+   100                                                                               'delta' : deltas[j + 1],
+   101                                                                               'epoch' : self.epoch.get(nid, 0)
+   102                                                                           }
+   103                                                                       }
+   104                                                                   else:
+   105                                                                       request_data = {
+   106                                                                           'node_feature' : node,
+   107                                                                           'epoch' : self.epoch.get(nid, 0)
+   108                                                                       }
+   109                                                                   future = executor.submit(self.send_message, node, json.dumps(request_data))
+   110                                                                   future_to_node[future] = node
+   111                                                           
+   112                                                           for future in as_completed(future_to_node):
+   113                                                               node = future_to_node[future]
+   114                                                               try:
+   115                                                                   response = future.result()
+   116                                                                   result = json.loads(response)
+   117                                                                   if j < k - 1:
+   118                                                                       node_neighbors_set.update(result['neighborhood'])
+   119                                                                   # asy debug: node's epoch is 0, which means bug in above return None
+   120                                                                   # if self.epoch[nid] == 1 and result['node_feature'] != result_syn_1_1_5000.get(node, 0):
+   121                                                                   #     with open('read_feature_error', 'a') as f: 
+   122                                                                   #         f.write(str(self.worker_id) + " " + nid + " " + node + " " + str(self.epoch.get(node, self.epoch[nid])) + " " + str(result['node_feature']) + " " + str(result_syn_1_1_5000.get(node, 0)) + "\n")
+   123                                                                   sums += result['node_feature']
+   124                                                               except Exception as exc:
+   125                                                                   print(f"khop_neighborhood generated an exception: {exc}")
+   126                                           
+   127                                                   return sums
+
+Total time: 0 s
+File: worker.py
+Function: aggregate_neighborhood_sync at line 129
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   129                                               @profile
+   130                                               def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
+   131                                                   with ThreadPoolExecutor() as executor:
+   132                                                       for node in list(self.node_data.keys()):
+   133                                                           executor.submit(self.update_node_epoch_sync, node, k, deltas)
+   134                                                           
+   135                                                   return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+
+Total time: 0 s
+File: worker.py
+Function: aggregate_neighborhood_async at line 137
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   137                                               @profile
+   138                                               def aggregate_neighborhood_async(self, target_epoch, k, deltas):
+   139                                                   filter_nodes = self.filter_nodes(target_epoch)
+   140                                                   needDo = filter_nodes.copy()
+   141                                                   temp = needDo.copy()
+   142                                                   with ThreadPoolExecutor() as executor:
+   143                                                       while True:
+   144                                                           for node in temp:
+   145                                                               needDo.remove(node)
+   146                                                               filter_nodes.remove(node)
+   147                                                               executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
+   148                                                               if self.update:
+   149                                                                   break
+   150                                                           
+   151                                                           if self.update:
+   152                                                               print('epoch update')
+   153                                                               needDo = random.shuffle(filter_nodes.copy())
+   154                                                               self.update = False
+   155                                                               continue
+   156                                                           else:
+   157                                                               temp = needDo.copy()
+   158                                                           
+   159                                                           result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+   160                                                           if len(result) == len(self.node_data):
+   161                                                               break
+   162                                                   
+   163                                                   return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+
+Total time: 0 s
+File: worker.py
+Function: filter_nodes at line 165
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   165                                               @profile
+   166                                               def filter_nodes(self, target_epoch):
+   167                                                   return [node for node in list(self.node_data.keys())
+   168                                                           if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
+
+Total time: 0 s
+File: worker.py
+Function: update_node_epoch_sync at line 170
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   170                                               @profile
+   171                                               def update_node_epoch_sync(self, node, k, deltas):
+   172                                                   new_feature = self.khop_neighborhood(node, k, deltas)
+   173                                                   
+   174                                                   history = self.node_data.get(node, {})
+   175                                                   my_epoch = sorted(list(history.keys()), reverse=True)[0]
+   176                                                   history[my_epoch + 1] = new_feature
+   177                                           
+   178                                                   self.epoch[node] += 1
+   179                                                   
+   180                                                   request_data = {
+   181                                                       'update_node_epoch': {
+   182                                                           'nid': node,
+   183                                                           'epoch': self.epoch[node]
+   184                                                       }
+   185                                                   }
+   186                                                   request_json = json.dumps(request_data)
+   187                                           
+   188                                                   with ThreadPoolExecutor() as executor:
+   189                                                       for server in range(4):
+   190                                                           if server != self.worker_id:
+   191                                                               executor.submit(self.send_message, server, request_json)
+
+Total time: 0 s
+File: worker.py
+Function: update_node_epoch_async at line 193
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   193                                               @profile
+   194                                               def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
+   195                                                   new_feature = self.khop_neighborhood(node, k, deltas)
+   196                                           
+   197                                                   if new_feature is not None:
+   198                                                       history = self.node_data.get(node, {})
+   199                                                       my_epoch = sorted(list(history.keys()), reverse=True)[0]
+   200                                                       history[my_epoch + 1] = new_feature
+   201                                                       
+   202                                                       self.epoch[node] += 1
+   203                                           
+   204                                                       request_data = {
+   205                                                           'update_node_epoch': {
+   206                                                               'nid': node,
+   207                                                               'epoch': self.epoch[node]
+   208                                                           }
+   209                                                       }
+   210                                                       request_json = json.dumps(request_data)
+   211                                           
+   212                                                       with ThreadPoolExecutor() as executor1:
+   213                                                           for server in range(4):
+   214                                                               if server != self.worker_id:
+   215                                                                   executor1.submit(self.send_message, server, request_json)
+   216                                                       
+   217                                                       if self.epoch[node] < target_epoch:
+   218                                                           needDo.append(node)
+   219                                                           filter_nodes.append(node)
+   220                                                   else:
+   221                                                       filter_nodes.append(node)
+
+Total time: 0 s
+File: worker.py
+Function: send_message at line 231
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   231                                               @profile
+   232                                               def send_message(self, node, message):
+   233                                                   print("Send message: ", message)
+   234                                                   while True:
+   235                                                       try:
+   236                                                           port = 12345 + int(node) % NUM_PARTITIONS
+   237                                                           proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
+   238                                                           response = proxy.handle_msg(message)
+   239                                                           print("Received response message: ", response)
+   240                                                           return response
+   241                                                       except Exception as e:
+   242                                                           # print(e)
+   243                                                           # print("!!!!!!RPC exception!!!!!!, retrying...")
+   244                                                           continue
+
+Total time: 0.003219 s
+File: worker.py
+Function: handle_msg at line 247
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   247                                               @profile
+   248                                               def handle_msg(self, message):
+   249        87        924.0     10.6     28.7          print("Received handle message: ", message)
+   250        87        521.0      6.0     16.2          request_data = json.loads(message)
+   251                                                   
+   252        87         21.0      0.2      0.7          if 'node_feature' in request_data:
+   253        87         17.0      0.2      0.5              nid = request_data['node_feature']
+   254        87        104.0      1.2      3.2              epoch = int(request_data.get('epoch', self.epoch.get(nid, 0)))
+   255                                           
+   256        87         55.0      0.6      1.7              if (int(nid) % NUM_PARTITIONS) != self.worker_id:
+   257                                                           response = self.send_message(nid, message)
+   258                                                           return response
+   259                                           
+   260        87         41.0      0.5      1.3              request_data = {
+   261        87        366.0      4.2     11.4                  'node_feature' : self.node_feature(nid, epoch)
+   262                                                       }
+   263                                                       
+   264                                                   elif 'khop_neighborhood' in request_data:
+   265                                                       nid = request_data['khop_neighborhood']['nid']
+   266                                                       k = request_data['khop_neighborhood']['k']
+   267                                                       deltas = request_data['khop_neighborhood']['deltas']
+   268                                                       
+   269                                                       if (int(nid) % NUM_PARTITIONS) != self.worker_id:
+   270                                                           response = self.send_message(nid, message)
+   271                                                           return response
+   272                                                       
+   273                                                       sums = self.khop_neighborhood(nid, k, deltas)
+   274                                                       
+   275                                                       request_data = {
+   276                                                           'node_feature' : sums if sums is not None else 'Not available.'
+   277                                                       }
+   278                                                       
+   279                                                   elif 'feature_and_neighborhood' in request_data:
+   280                                                       nid = request_data['feature_and_neighborhood']['nid']
+   281                                                       delta = request_data['feature_and_neighborhood']['delta']
+   282                                                       epoch = request_data['feature_and_neighborhood']['epoch']
+   283                                                       
+   284                                                       if (int(nid) % NUM_PARTITIONS) != self.worker_id:
+   285                                                           response = self.send_message(nid, message)
+   286                                                           return response
+   287                                                       
+   288                                                       feature, neighborhoodSet = self.feature_and_neighborhood(nid, delta, epoch)
+   289                                                       request_data = {
+   290                                                           'node_feature' : feature, 
+   291                                                           'neighborhood' : neighborhoodSet 
+   292                                                       }
+   293                                                   
+   294                                                   elif 'neighborhood_aggregation_sync' in request_data:
+   295                                                       final_epoch = request_data['neighborhood_aggregation_sync']['epochs']
+   296                                                       k = request_data['neighborhood_aggregation_sync']['k']
+   297                                                       deltas = request_data['neighborhood_aggregation_sync']['deltas']
+   298                                                   
+   299                                                       for epoch in range(1, final_epoch + 1):
+   300                                                           request_data = {
+   301                                                               'graph_weight_sync': {
+   302                                                                   'target_epoch': epoch,
+   303                                                                   'k': k,
+   304                                                                   'deltas': deltas
+   305                                                               }
+   306                                                           }
+   307                                                           request_json = json.dumps(request_data)
+   308                                           
+   309                                                           with ThreadPoolExecutor() as executor:
+   310                                                               futures = {executor.submit(self.send_message, server, request_json): server for server in range(4)}
+   311                                           
+   312                                                           if epoch == final_epoch:
+   313                                                               epoch_dict = {}
+   314                                                               for future in as_completed(futures):
+   315                                                                   try:
+   316                                                                       response = future.result()
+   317                                                                       request_data = json.loads(response)
+   318                                                                       epoch_dict.update(request_data['graph_weight_sync'])
+   319                                                                   except Exception as exc:
+   320                                                                       print(f"neighborhood_aggregation generated an exception: {exc}")
+   321                                                           
+   322                                                       request_data = {
+   323                                                           'epoch_dict' : epoch_dict
+   324                                                       }
+   325                                           
+   326                                                   elif 'neighborhood_aggregation_async' in request_data:
+   327                                                       final_epoch = request_data['neighborhood_aggregation_async']['epochs']
+   328                                                       k = request_data['neighborhood_aggregation_async']['k']
+   329                                                       deltas = request_data['neighborhood_aggregation_async']['deltas']
+   330                                           
+   331                                                       request_data = {
+   332                                                           'graph_weight_async': {
+   333                                                               'target_epoch': final_epoch,
+   334                                                               'k': k,
+   335                                                               'deltas': deltas
+   336                                                           }
+   337                                                       }
+   338                                                       request_json = json.dumps(request_data)
+   339                                           
+   340                                                       epoch_dict = {}
+   341                                                       with ThreadPoolExecutor() as executor:
+   342                                                           futures = {executor.submit(self.send_message, server, request_json): server for server in range(4)}
+   343                                                           for future in as_completed(futures):
+   344                                                               try:
+   345                                                                   response = future.result()
+   346                                                                   request_data = json.loads(response)
+   347                                                                   epoch_dict.update(request_data['graph_weight_async'])
+   348                                                               except Exception as exc:
+   349                                                                   print(f"neighborhood_aggregation generated an exception: {exc}")
+   350                                           
+   351                                                       request_data = {
+   352                                                           'epoch_dict' : epoch_dict
+   353                                                       }    
+   354                                                               
+   355                                                   elif 'graph_weight_sync' in request_data:
+   356                                                       target_epoch = request_data['graph_weight_sync']['target_epoch']
+   357                                                       k = request_data['graph_weight_sync']['k']
+   358                                                       deltas = request_data['graph_weight_sync']['deltas']
+   359                                           
+   360                                                       if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
+   361                                                           request_data = {
+   362                                                               'graph_weight_sync' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+   363                                                           } 
+   364                                                       else:
+   365                                                           request_data = {
+   366                                                               'graph_weight_sync' : self.aggregate_neighborhood_sync(target_epoch, k, deltas)
+   367                                                           }
+   368                                                   
+   369                                                   elif 'graph_weight_async' in request_data:
+   370                                                       target_epoch = request_data['graph_weight_async']['target_epoch']
+   371                                                       k = request_data['graph_weight_async']['k']
+   372                                                       deltas = request_data['graph_weight_async']['deltas']
+   373                                           
+   374                                                       if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
+   375                                                           request_data = {
+   376                                                               'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+   377                                                           } 
+   378                                                       else:
+   379                                                           request_data = {
+   380                                                               'graph_weight_async' : self.aggregate_neighborhood_async(target_epoch, k, deltas)
+   381                                                           }
+   382                                           
+   383                                                   elif 'update_node_epoch' in request_data:
+   384                                                       node = request_data['update_node_epoch']['nid']
+   385                                                       epoch = request_data['update_node_epoch']['epoch']
+   386                                           
+   387                                                       self.epoch[node] = epoch
+   388                                                       
+   389                                                       self.update = True
+   390                                           
+   391                                                       return 'ok'
+   392                                                   
+   393        87        611.0      7.0     19.0          request_json = json.dumps(request_data)
+   394                                                   
+   395        87        546.0      6.3     17.0          print('reply:', request_json)
+   396        87         13.0      0.1      0.4          return request_json
+

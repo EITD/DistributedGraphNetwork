@@ -27,3 +27,17 @@ Mandatory administratve tasks:
 Bonus tasks:
 
 - [ ] Your solution has an appropriate performance evaluation.
+
+## How To Run
+
+- Start Client: 
+
+  `python3 client.py`
+
+- Start Worker: 
+
+  `kernprof -l worker.py {worker_id}`
+
+- Benchmark: 
+  
+  For each worker, stop and `python3 parse_lprof_to_file.py {worker_id}`

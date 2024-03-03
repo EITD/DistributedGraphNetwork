@@ -1,21 +1,19 @@
 import json
-import time
 import xmlrpc.client
 import threading
 from ConvertFile import ConvertFile
+from decorators import timeit
 
 # graph all edges from 4 partition
 all_graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
 
+@timeit
 def send_message(message):
     # default send to worker 0
-    start_time = time.time()
     proxy = xmlrpc.client.ServerProxy(f"http://localhost:12345")
     print("Send message: ", message)
     response = proxy.handle_msg(message)
-    end_time = time.time()
     print(f"Server response: {response}")
-    print("duration: ", end_time - start_time)
     
     # long response write into file
     # with open('check', 'w') as f: 
@@ -23,7 +21,7 @@ def send_message(message):
 
     # train test
     # test_mult_epochs(response, 5)
-    # test_all_neighbors(response, 2)
+    # test_all_neighbors(response, 2) not work
 
 # when node feature all 1(load dummmy), default is 2 ** epoch, multiple epochs, k = 1, deltas = [1]
 def test_mult_epochs(response, epoch):
@@ -51,7 +49,6 @@ def test_mult_epochs(response, epoch):
 #         sums += len(temp)
 #         if k != 1: sums += recursion(k-1, temp)
 #     return sums
-
 
 def query_node_feature(nid):
     request_data = {
@@ -108,7 +105,7 @@ def train_asynchronize(epochs, k, deltas):
 
 # query_khop_neighborhood(3, 3, [2, 18, 32])
     
-# query_khop_neighborhood(0, 1, 5000)
+query_khop_neighborhood(0, 1, 5000)
 
 # train_synchronize(2, 1, 5000)
 

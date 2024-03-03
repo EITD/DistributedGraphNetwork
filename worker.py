@@ -7,6 +7,11 @@ from xmlrpc.server import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 import xmlrpc.client
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 from socketserver import ThreadingMixIn
+try:
+    profile
+except NameError:
+    def profile(func):
+        return func
 
 NUM_PARTITIONS = 4
 # dummy file for test
@@ -27,6 +32,7 @@ class Worker:
     def __init__(self, wid):
         self.worker_id = int(wid)
 
+    @profile
     def load_node_data(self):
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
@@ -36,9 +42,11 @@ class Worker:
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
                 self.node_data[parts[0]] = {0:int(parts[1])}
 
+    @profile
     def load_graph_dict(self):
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         
+    @profile   
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
         temp = history.get(epoch, NODE_DEFAULT_FEATURE)
@@ -48,6 +56,7 @@ class Worker:
         #         f.write(nid + " " + str(history) + "\n")
         return temp
         
+    @profile    
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
         if nid in self.node_data.keys():
@@ -56,6 +65,7 @@ class Worker:
         
         return self.node_feature(nid, epoch), random_neighbors
     
+    @profile
     def khop_neighborhood(self, nid, k, deltas):
         sums = self.node_feature(nid, self.epoch.get(nid, 0))
         node_neighbors_set = set()
@@ -116,6 +126,7 @@ class Worker:
 
         return sums
     
+    @profile
     def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
         with ThreadPoolExecutor() as executor:
             for node in list(self.node_data.keys()):
@@ -123,6 +134,7 @@ class Worker:
                 
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     
+    @profile
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         filter_nodes = self.filter_nodes(target_epoch)
         needDo = filter_nodes.copy()
@@ -150,10 +162,12 @@ class Worker:
         
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
 
+    @profile
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
+    @profile
     def update_node_epoch_sync(self, node, k, deltas):
         new_feature = self.khop_neighborhood(node, k, deltas)
         
@@ -176,6 +190,7 @@ class Worker:
                 if server != self.worker_id:
                     executor.submit(self.send_message, server, request_json)
     
+    @profile
     def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
         new_feature = self.khop_neighborhood(node, k, deltas)
 
@@ -213,6 +228,7 @@ class Worker:
     #         print("Receive response: ", response)
     #         return response
 
+    @profile
     def send_message(self, node, message):
         print("Send message: ", message)
         while True:
@@ -228,6 +244,7 @@ class Worker:
                 continue
 
 # TODO: improve: rpc call different methods
+    @profile
     def handle_msg(self, message):
         print("Received handle message: ", message)
         request_data = json.loads(message)

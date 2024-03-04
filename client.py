@@ -21,7 +21,7 @@ def send_message(message):
 
     # train test
     # test_mult_epochs(response, epoch)
-    # test_all_neighbors(response, k)
+    # test_all_neighbors(response)
 
 # when node feature all 1(load dummmy), default is 2 ** epoch, multiple epochs, k = 1, deltas = [1]
 def test_mult_epochs(response, epoch):
@@ -31,7 +31,7 @@ def test_mult_epochs(response, epoch):
                     print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
 
 # when node feature all 1(load dummmy), default is 1, epoch = 1, k = 1, deltas = [5000]
-def test_all_neighbors(response, k):
+def test_all_neighbors(response):
     data = json.loads(response)['epoch_dict']
     for key, value in data.items():
         sums = 1
@@ -100,6 +100,8 @@ def train_asynchronize(epochs, k, deltas):
 
 # train_synchronize(2, 1, 5000)
 
-train_asynchronize(2, 1, 5000)
+# train_asynchronize(2, 1, 5000)
 
 # train_asynchronize(5, 1, 1)
+
+# train_asynchronize(1, 1, 5000)

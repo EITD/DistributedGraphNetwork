@@ -309,9 +309,9 @@ class Worker:
 
                 # Since the update of the future list in `aggregate_neighborhood_async` may not be timely, 
                 # we need to judge the both futures and epoch to ensure that no new futures will be added.
-                while target_epoch > sorted(list(set(self.epoch.values())))[0]:
-                    self.aggregate_neighborhood_async(target_epoch, k, deltas)
+                while target_epoch > min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
                     print('do one more time')
+                    self.aggregate_neighborhood_async(target_epoch, k, deltas)
                 request_data = {
                     'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                 }

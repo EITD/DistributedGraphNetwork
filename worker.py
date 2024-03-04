@@ -1,6 +1,7 @@
 import random
 import socket
 import threading
+from time import sleep
 from ConvertFile import ConvertFile
 import json
 import sys
@@ -51,6 +52,7 @@ class Worker:
         return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
+        # try:
         sums = self.node_feature(nid, self.epoch[nid])
         
         node_neighbors_set = set()
@@ -109,6 +111,9 @@ class Worker:
                 if j < k - 1:
                     node_neighbors_set.update(data['neighborhood'])
                 sums += data['node_feature']
+        # except Exception as e:
+        #     with open('khop_e', 'a') as f:
+        #         f.write(str(nid) + ': ' + str(k) + ' ' + str(deltas))
         return sums
     
     def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
@@ -126,7 +131,7 @@ class Worker:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
             for node in filter_nodes:
-                future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor, futures)
+                future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
                 futures.append(future)
             concurrent.futures.wait(futures)
 
@@ -156,7 +161,7 @@ class Worker:
                 if server != self.worker_id:
                     executor.submit(tell, server, request_json)
     
-    def update_node_epoch_async(self, node, target_epoch, k, deltas, executor, futures):
+    def update_node_epoch_async(self, node, target_epoch, k, deltas, executor):
         new_feature = self.khop_neighborhood(node, k, deltas)
         
         if new_feature is not None:
@@ -180,8 +185,9 @@ class Worker:
                         broadcast.submit(tell, server, request_json)
             
             if self.epoch[node] < target_epoch:
-                future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor, futures)
-                futures.append(future)
+                future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
+                concurrent.futures.wait(future)
+                # futures.append(future)
 
     def handle_msg(self, message):
         request_data = json.loads(message)
@@ -312,7 +318,7 @@ class Worker:
                 # Since the update of the future list in `aggregate_neighborhood_async` may not be timely, 
                 # we need to judge the both futures and epoch to ensure that no new futures will be added.
                 while target_epoch > min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
-                    print('do one more time')
+                    # print('do one more time')
                     self.aggregate_neighborhood_async(target_epoch, k, deltas)
                 request_data = {
                     'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}

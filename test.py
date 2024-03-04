@@ -16,4 +16,4 @@ for key, value in result_syn_2_1_5000.items():
     if a.get(str(key), 0) != value:
         count += 1
         print(key, value, a.get(str(key), 0))
-print('Different counts:', count)
+print('Different counts:', count,'/',len(result_asy_1_1_5000))

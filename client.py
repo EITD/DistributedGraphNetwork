@@ -88,9 +88,9 @@ response = ''
 
 # response = query_khop_neighborhood(0, 1, 5000)
 
-response = train_synchronize(2, 1, 5000)
+# response = train_synchronize(2, 1, 5000)
 
-# response = train_asynchronize(2, 1, 2)
+response = train_asynchronize(2, 1, 5000)
 
 # response = train_asynchronize(5, 1, 1)
 

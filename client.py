@@ -23,7 +23,6 @@ def ask(msg):
     
     print('get reply:', data)
 
-    client_socket.shutdown(socket.SHUT_RDWR)
     client_socket.close()
     
     print('duration:', end - start)
@@ -91,6 +90,10 @@ response = ''
 # response = train_synchronize(2, 1, 5000)
 
 response = train_asynchronize(2, 1, 5000)
+
+# response = train_asynchronize(2, 10, [1,2,3,4,5,6,7,8,9,10])
+
+# response = train_asynchronize(2, 2, [5000, 5000**2])
 
 # response = train_asynchronize(5, 1, 1)
 

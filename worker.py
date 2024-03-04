@@ -13,7 +13,6 @@ testIp = host
 serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
 NODE_DEFAULT_FEATURE = 0
 
-# testNodeFeatures = {}
 class NodeForOtherWorker(Exception):
     def __init__(self):
         pass
@@ -32,7 +31,6 @@ class Worker:
         for line in lines:
             parts = line.strip().split()[:2]
             self.epoch[parts[0]] = 0
-            # testNodeFeatures[parts[0]] = int(parts[1])
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
                 self.node_data[parts[0]] = {0:int(parts[1])}
                 # self.graph_weight[0] += int(parts[1])
@@ -177,9 +175,9 @@ class Worker:
                     if server != self.worker_id:
                         broadcast.submit(tell, server, request_json)
             
-        if self.epoch[node] < target_epoch:
-            future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor, futures)
-            futures.append(future)
+            if self.epoch[node] < target_epoch:
+                future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor, futures)
+                futures.append(future)
 
     def handle_msg(self, message):
         request_data = json.loads(message)
@@ -360,7 +358,7 @@ def ask(node, msg):
             client_socket.close()
             return data
         except (ConnectionRefusedError):
-            print('ask error')
+            # print('ask error')
             client_socket.close()
             continue
     
@@ -379,7 +377,7 @@ def tell(server, msg):
             client_socket.close()
             break
         except (ConnectionRefusedError):
-            print('tell error')
+            # print('tell error')
             client_socket.close()
             continue
 

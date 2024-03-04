@@ -40,7 +40,7 @@ Bonus tasks:
 
 ## Benchmark
 
-### Line Analysis
+### Line(Time) Analysis
 
 - Start Worker: 
 
@@ -60,7 +60,7 @@ Bonus tasks:
 
   `mprof plot mprofile{worker_id}.dat --output memory_results{worker_id}.png`
 
-  > Train result may be too big to transfer into graph.
+  > Train result may be too big to transfer into graph. Instead, execute `python3 parse_dat_to_graph.py` to get a general memory usage graph.
 
 ### Performance
 

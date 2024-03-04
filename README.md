@@ -28,7 +28,21 @@ Bonus tasks:
 
 - [ ] Your solution has an appropriate performance evaluation.
 
-## How To Run
+## Summary of what implemented
+
+We have implemented a distributed graph store system aimed at managing graph-based data across multiple workers. Here's a brief summary of the implemented features:
+
+1. Basic Infrastructure: We designed a distributed system where graph partitions are distributed over 4 workers. Each worker runs as a separate process, supporting basic `Get(nid)` operations to retrieve node features by their ID. 
+
+2. Neighborhood Queries: We implemented `Khop_Neighborhood(nid, k, (δ0,...,δk-1))` operations to support k-hop neighborhood queries, which calculate the aggregated features of a node's neighborhood up to k hops away.
+
+3. Message-Passing-Based Neighborhood Aggregation: To simulate the neighborhood aggregation process of GNN training, we introduced a `Train(epochs)` operation. This iterates over nodes to compute new weights based on k-hop neighborhood aggregations, with each node storing a history of aggregation weights. `Future` mechanism was considered to manage the completion of epochs and support synchronous training operations.
+
+4. Marker-Based Asynchronous Training: We explored asynchronous training through iterative k-hop neighborhood aggregations, maintaining a `epoch_dict`(marker) recording each node's epoch to keep causality across aggregation steps and epochs. The marker should be disseminated across workers to signal readiness for next epoch's iteration computations.
+
+5. Performance Evaluation: We provided two versions of solutions based on message-passing protocol: Socket and RPC. We conducted benchmarks to evaluate and compare the performance of each solution, focusing on both the time complexity of individual lines of code within our functions and memory usage of each functions. 
+
+## Run
 
 - Start Client: 
 
@@ -38,7 +52,18 @@ Bonus tasks:
 
   `python3 worker.py {worker_id}`
 
-## Benchmark
+## Test
+
+In the client, we provided test cases for each feature. 
+
+We also provided two test functions to verify the accuracy of train result in depth and breadth:
+
+- test_mult_epochs(response, epoch)
+- test_all_neighbors(response, k)
+
+> Use node_features_dummy.txt and change default node feature in the code.
+
+## Evaluation
 
 ### Line(Time) Analysis
 

@@ -118,7 +118,11 @@ class Worker:
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
-        filter_nodes = self.filter_nodes(target_epoch)
+        minEpoch = min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id)
+        filter_nodes_1 = self.filter_nodes(minEpoch + 1)
+        filter_nodes_2 = self.filter_nodes(target_epoch)
+        filter_nodes = filter_nodes_1.copy()
+        filter_nodes.extend(node for node in filter_nodes_2 if node not in filter_nodes_1)
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
             for node in filter_nodes:

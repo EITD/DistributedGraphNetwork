@@ -2,6 +2,7 @@ import random
 import socket
 import threading
 from time import sleep
+import traceback
 from ConvertFile import ConvertFile
 import json
 import sys
@@ -52,68 +53,75 @@ class Worker:
         return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
-        # try:
-        sums = self.node_feature(nid, self.epoch[nid])
-        
-        node_neighbors_set = set()
-        if nid in self.node_data.keys():
-            node_neighbors_set = set(self.graph.neighbors(nid))
-        
-        for j in range(k): # [2,3,2]
-            random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
+        try:
+            sums = self.node_feature(nid, self.epoch[nid])
+            
             node_neighbors_set = set()
+            if nid in self.node_data.keys():
+                node_neighbors_set = set(self.graph.neighbors(nid))
             
-            for node in random_neighbors:
-                node_epoch = self.epoch.get(node, self.epoch[nid])
-                if node_epoch < self.epoch[nid]:
-                    return None
-            
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                feature_and_neighborhood_list = []
-                feature_and_neighborhood_list_ask = []
+            for j in range(k): # [2,3,2]
+                random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
+                node_neighbors_set = set()
+                
                 for node in random_neighbors:
-                    if (int(node) % NUM_PARTITIONS) == self.worker_id:
-                        print(f'!!!self get: {node}!!!')
-                        if j < k - 1:
-                            future = executor.submit(self.feature_and_neighborhood, node, deltas[j + 1], self.epoch[nid])
-                        else: 
-                            future = executor.submit(self.node_feature, node, self.epoch[nid])
-                        feature_and_neighborhood_list.append(future)
-                    else:
-                        if j < k - 1:
-                            request_data = {
-                                'feature_and_neighborhood' : {
-                                    'nid' : node,
-                                    'delta' : deltas[j + 1],
+                    node_epoch = self.epoch.get(node, self.epoch[nid])
+                    if node_epoch < self.epoch[nid]:
+                        return None
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    feature_and_neighborhood_list = []
+                    feature_and_neighborhood_list_ask = []
+                    for node in random_neighbors:
+                        if (int(node) % NUM_PARTITIONS) == self.worker_id:
+                            print(f'!!!self get: {node}!!!')
+                            if j < k - 1:
+                                future = executor.submit(self.feature_and_neighborhood, node, deltas[j + 1], self.epoch[nid])
+                            else: 
+                                future = executor.submit(self.node_feature, node, self.epoch[nid])
+                            feature_and_neighborhood_list.append(future)
+                        else:
+                            if j < k - 1:
+                                request_data = {
+                                    'feature_and_neighborhood' : {
+                                        'nid' : node,
+                                        'delta' : deltas[j + 1],
+                                        'epoch' : self.epoch[nid]
+                                    }
+                                }
+                                future = executor.submit(ask, node, json.dumps(request_data))
+                            else:
+                                request_data = {
+                                    'node_feature' : node,
                                     'epoch' : self.epoch[nid]
                                 }
-                            }
-                            future = executor.submit(ask, node, json.dumps(request_data))
-                        else:
-                            request_data = {
-                                'node_feature' : node,
-                                'epoch' : self.epoch[nid]
-                            }
-                            future = executor.submit(ask, node, json.dumps(request_data))
-                        feature_and_neighborhood_list_ask.append(future)
+                                future = executor.submit(ask, node, json.dumps(request_data))
+                            feature_and_neighborhood_list_ask.append((future, node))
 
-            node_neighbors_set = set()
-            
-            for future in feature_and_neighborhood_list:
-                if j < k - 1:
-                    node_feature, neighborhood = future.result()
-                    node_neighbors_set.update(neighborhood)
-                else:
-                    node_feature = future.result()
-                sums += node_feature
-            for future in feature_and_neighborhood_list_ask:
-                data = json.loads(future.result())
-                if j < k - 1:
-                    node_neighbors_set.update(data['neighborhood'])
-                sums += data['node_feature']
-        # except Exception as e:
-        #     with open('khop_e', 'a') as f:
-        #         f.write(str(nid) + ': ' + str(k) + ' ' + str(deltas))
+                node_neighbors_set = set()
+                
+                for future in feature_and_neighborhood_list:
+                    if j < k - 1:
+                        node_feature, neighborhood = future.result()
+                        node_neighbors_set.update(neighborhood)
+                    else:
+                        node_feature = future.result()
+                    sums += node_feature
+                for future, node in feature_and_neighborhood_list_ask:
+                    msg = future.result()
+                    data = json.loads(msg)
+                    # if testNodeFeatures.get(node, 0) != data['node_feature'] or data is None:
+                    #     with open('khop_neighborhood_msg_wrong_features', 'a') as f:
+                    #         f.write(str(node) + ' ' + str(data['serverId']) + '  ' + str(data) + '  ' + str(data['node_feature']) + ' ' + str(testNodeFeatures.get(node, 0)) + '\n')
+                    # if (int(node)%4) != data['serverId'] or data is None:
+                    #     with open('khop_neighborhood_msg_wrong_server', 'a') as f:
+                    #         f.write(str(node) + ' ' + str(data['serverId']) + '  ' + str(data) + '  ' + str(data['node_feature']) + ' ' + str(testNodeFeatures.get(node, 0)) + '\n')
+                    if j < k - 1:
+                        node_neighbors_set.update(data['neighborhood'])
+                    sums += data['node_feature']
+        except Exception as e:
+            with open('khop_neighborhood', 'a') as f:
+                f.write(str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
         return sums
     
     def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
@@ -328,7 +336,8 @@ class Worker:
                 node = request_data['update_node_epoch']['nid']
                 epoch = request_data['update_node_epoch']['epoch']
                 
-                self.epoch[node] = epoch
+                if epoch > self.epoch[node]:
+                    self.epoch[node] = epoch
 
                 return
             request_json = json.dumps(request_data)
@@ -347,7 +356,7 @@ def handle_client(client_socket, worker):
         client_socket.send(message.encode())
     else:
         worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
-    client_socket.shutdown(socket.SHUT_RDWR)
+    # client_socket.shutdown(socket.SHUT_RDWR)
     client_socket.close()
 
 def ask(node, msg):
@@ -399,7 +408,7 @@ def start_worker(wid, port):
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     server_socket.bind((host, port))
-    server_socket.listen(60000)
+    server_socket.listen(1000)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         while True:
             client_socket, _ = server_socket.accept()

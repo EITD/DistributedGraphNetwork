@@ -89,11 +89,15 @@ response = ''
 
 # response = train_synchronize(2, 1, 5000)
 
-response = train_asynchronize(2, 1, 5000)
+# response = train_asynchronize(2, 1, 5000)
 
 # response = train_asynchronize(2, 10, [1,2,3,4,5,6,7,8,9,10])
 
 # response = train_synchronize(2, 2, [100, 100])
+
+response = train_synchronize(5, 1, 10)
+
+# response = train_asynchronize(2, 2, [100, 100])
 
 # response = train_synchronize(2, 2, [5000, 5000**2])
 

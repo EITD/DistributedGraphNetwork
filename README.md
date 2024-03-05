@@ -18,15 +18,15 @@ Mandatory administratve tasks:
 - [x] Your project uses GitHub for the collaboration.
   - The commits are balanced among group members.
   - Your project is private (for the duration of the course VT24; you can make it public later).
-- [ ] Your project's README contains the following:
+- [x] Your project's README contains the following:
   - A summary of what you have implemented.
   - Instructions on how to run, test, and evaluate the project.
   - A statement of contributions: who has done what.
-- [ ] Your solution is documented.
+- [x] Your solution is documented.
 
 Bonus tasks:
 
-- [ ] Your solution has an appropriate performance evaluation.
+- [x] Your solution has an appropriate performance evaluation.
 
 ## Summary of what implemented
 
@@ -99,3 +99,12 @@ We also provided two test functions to verify the accuracy of train result in de
 
   For each worker, stop and execute `snakeviz performance_results{worker_id}.prof`
   
+## Contributions
+
+We extend our deepest gratitude to our team members: Yining Hou, Long Ma, Hong Jiang, who have collectively contributed to every aspect of this project.
+
+**Yining Hou**: Made significant contributions to the project, particularly in guiding the development of the RPC version and undertaking the benchmarking efforts. 
+
+**Long Ma**: Played a vital role in the development process, with a notable focus on the Socket version. His contributions have significantly enhanced our project's efficiency.
+
+**Hong Jiang**: Involved in the project's comprehensive development, with a particular focus on testing. Her rigorous approach to testing has ensured the reliability of our solutions.

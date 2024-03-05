@@ -18,7 +18,7 @@ NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
 # node without feature default value
 NODE_DEFAULT_FEATURE = 0
-server_list = ['192.168.1.102', '192.168.1.102', '192.168.1.102', '192.168.1.102']
+server_list = ['130.229.166.77', '130.229.177.85', '130.229.166.77', '130.229.177.85']
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -28,7 +28,7 @@ class Worker:
     node_data = {}
     graph = {}
     epoch = {}
-    update = False
+    # update = False
 
     def __init__(self, wid):
         self.worker_id = int(wid)
@@ -137,31 +137,17 @@ class Worker:
     
     @profile
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
-        filter_nodes = self.filter_nodes(target_epoch)
-        needDo = filter_nodes.copy()
-        temp = needDo.copy()
+        minEpoch = min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id)
+        filter_nodes_1 = self.filter_nodes(minEpoch + 1)
+        filter_nodes_2 = self.filter_nodes(target_epoch)
+        filter_nodes = filter_nodes_1.copy()
+        filter_nodes.extend(node for node in filter_nodes_2 if node not in filter_nodes_1)
         with ThreadPoolExecutor() as executor:
-            while True:
-                for node in temp:
-                    needDo.remove(node)
-                    filter_nodes.remove(node)
-                    executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, filter_nodes, needDo)
-                    if self.update:
-                        break
-                
-                if self.update:
-                    print('epoch update')
-                    needDo = random.shuffle(filter_nodes.copy())
-                    self.update = False
-                    continue
-                else:
-                    temp = needDo.copy()
-                
-                result = {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-                if len(result) == len(self.node_data):
-                    break
-        
-        return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+            futures = []
+            for node in filter_nodes:
+                future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
+                futures.append(future)
+            wait(futures)
 
     @profile
     def filter_nodes(self, target_epoch):
@@ -192,7 +178,7 @@ class Worker:
                     executor.submit(self.send_message, server, request_json)
     
     @profile
-    def update_node_epoch_async(self, node, target_epoch, k, deltas, filter_nodes, needDo):
+    def update_node_epoch_async(self, node, target_epoch, k, deltas, executor):
         new_feature = self.khop_neighborhood(node, k, deltas)
 
         if new_feature is not None:
@@ -216,10 +202,9 @@ class Worker:
                         executor1.submit(self.send_message, server, request_json)
             
             if self.epoch[node] < target_epoch:
-                needDo.append(node)
-                filter_nodes.append(node)
-        else:
-            filter_nodes.append(node)
+                future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
+                wait(future)
+
     
     # simple rpc server, start thread in each request but not work
     # def send_to_other(self, node, message):
@@ -373,22 +358,22 @@ class Worker:
             k = request_data['graph_weight_async']['k']
             deltas = request_data['graph_weight_async']['deltas']
 
-            if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
-                request_data = {
-                    'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-                } 
-            else:
-                request_data = {
-                    'graph_weight_async' : self.aggregate_neighborhood_async(target_epoch, k, deltas)
-                }
+            while target_epoch > min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
+                # print('do one more time')
+                self.aggregate_neighborhood_async(target_epoch, k, deltas)
+
+            request_data = {
+                'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
+            }
 
         elif 'update_node_epoch' in request_data:
             node = request_data['update_node_epoch']['nid']
             epoch = request_data['update_node_epoch']['epoch']
 
-            self.epoch[node] = epoch
+            if epoch > self.epoch[node]:
+                self.epoch[node] = epoch
             
-            self.update = True
+            # self.update = True
 
             return 'ok'
         

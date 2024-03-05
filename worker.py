@@ -18,6 +18,7 @@ NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
 # node without feature default value
 NODE_DEFAULT_FEATURE = 0
+server_list = ['192.168.1.102', '192.168.1.102', '192.168.1.102', '192.168.1.102']
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -234,7 +235,8 @@ class Worker:
         while True:
             try:
                 port = 12345 + int(node) % NUM_PARTITIONS
-                proxy = xmlrpc.client.ServerProxy(f"http://localhost:{port}")
+                server = server_list[int(node) % NUM_PARTITIONS]
+                proxy = xmlrpc.client.ServerProxy(f"http://{server}:{port}")
                 response = proxy.handle_msg(message)
                 print("Received response message: ", response)
                 return response
@@ -402,7 +404,7 @@ class RequestHandler(SimpleXMLRPCRequestHandler):
     rpc_paths = ('/RPC2',)
 
 def run_server(wid, port):
-    server = ThreadedXMLRPCServer(('localhost', port), requestHandler=RequestHandler)
+    server = ThreadedXMLRPCServer((server_list[int(wid)], port), requestHandler=RequestHandler)
     worker = Worker(wid)
     worker.load_node_data()
     worker.load_graph_dict()

@@ -6,11 +6,12 @@ from decorators import timeit
 
 # graph all edges from 4 partition
 all_graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
+host = 'http://192.168.1.102:12345'
 
 @timeit
 def send_message(message):
     # default send to worker 0
-    proxy = xmlrpc.client.ServerProxy(f"http://localhost:12345")
+    proxy = xmlrpc.client.ServerProxy(host)
     print("Send message: ", message)
     response = proxy.handle_msg(message)
     print(f"Server response: {response}")
@@ -94,7 +95,7 @@ def train_asynchronize(epochs, k, deltas):
 
 # query_khop_neighborhood(8, 2, [5000, 5000**2])
 
-# query_khop_neighborhood(3, 3, [2, 18, 32])
+query_khop_neighborhood(3, 3, [2, 18, 32])
     
 # query_khop_neighborhood(0, 1, 5000)
 

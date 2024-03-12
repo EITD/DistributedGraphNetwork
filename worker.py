@@ -147,6 +147,7 @@ class Worker:
             for node in filter_nodes:
                 future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
                 futures.append(future)
+            # update = true的时候跳出循环，然后重新开始
             wait(futures)
 
     @profile
@@ -374,6 +375,7 @@ class Worker:
                 self.epoch[node] = epoch
             
             # self.update = True
+            # 如果更新的是最小的epoch，就把update改成true。
 
             return 'ok'
         

@@ -321,7 +321,11 @@ class Worker:
 
                 while target_epoch > min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
                     # print('do one more time')
-                    self.aggregate_neighborhood_async(target_epoch, k, deltas)
+                    if self.updateFlag:
+                        self.aggregate_neighborhood_async(target_epoch, k, deltas)
+                        self.updateFlag = False
+                    else:
+                        sleep(0.5)
                 request_data = {
                     'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                 }
@@ -332,6 +336,7 @@ class Worker:
                 
                 if epoch > self.epoch[node]:
                     self.epoch[node] = epoch
+                    self.updateFlag = True
 
                 return
             request_json = json.dumps(request_data)
@@ -351,6 +356,7 @@ def handle_client(client_socket, worker):
             client_socket.send(message.encode())
         else:
             worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
+            
         # client_socket.shutdown(socket.SHUT_RDWR)
     finally:
         client_socket.close()

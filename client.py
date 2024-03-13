@@ -6,7 +6,7 @@ from decorators import timeit
 
 # graph all edges from 4 partition
 all_graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
-host = 'http://192.168.1.102:12345'
+host = 'http://192.168.1.101:12345'
 
 @timeit
 def send_message(message):
@@ -17,8 +17,8 @@ def send_message(message):
     print(f"Server response: {response}")
     
     # long response write into file
-    # with open('check', 'w') as f: 
-    #     f.write(str(json.loads(response)['epoch_dict'])) 
+    with open('check', 'w') as f: 
+        f.write(str(json.loads(response)['epoch_dict'])) 
 
     # train test
     # test_mult_epochs(response, epoch)
@@ -95,13 +95,15 @@ def train_asynchronize(epochs, k, deltas):
 
 # query_khop_neighborhood(8, 2, [5000, 5000**2])
 
-query_khop_neighborhood(3, 3, [2, 18, 32])
+# query_khop_neighborhood(3, 3, [2, 18, 32])
     
-# query_khop_neighborhood(0, 1, 5000)
+# query_khop_neighborhood(3, 3, [5000, 5000 ** 2, 5000 ** 3])
 
 # train_synchronize(2, 1, 5000)
+    
+train_synchronize(1, 2, [5000, 5000 ** 2])
 
-# train_asynchronize(2, 1, 5000)
+# train_asynchronize(1, 2, [5000, 5000 ** 2])
 
 # train_asynchronize(5, 1, 1)
 

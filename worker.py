@@ -23,6 +23,7 @@ class Worker:
     node_data = {}
     graph = {}
     epoch = {}
+    updateFlag = True
 
     def __init__(self, wid):
         self.worker_id = int(wid)
@@ -96,7 +97,9 @@ class Worker:
                                     'epoch' : self.epoch[nid]
                                 }
                                 future = executor.submit(ask, node, json.dumps(request_data))
-                            feature_and_neighborhood_list_ask.append((future, node))
+                            feature_and_neighborhood_list_ask.append(future)
+                concurrent.futures.wait(feature_and_neighborhood_list)
+                concurrent.futures.wait(feature_and_neighborhood_list_ask)
 
                 node_neighbors_set = set()
                 
@@ -107,21 +110,15 @@ class Worker:
                     else:
                         node_feature = future.result()
                     sums += node_feature
-                for future, node in feature_and_neighborhood_list_ask:
-                    msg = future.result()
+                for ask_future in feature_and_neighborhood_list_ask:
+                    msg = ask_future.result()
                     data = json.loads(msg)
-                    # if testNodeFeatures.get(node, 0) != data['node_feature'] or data is None:
-                    #     with open('khop_neighborhood_msg_wrong_features', 'a') as f:
-                    #         f.write(str(node) + ' ' + str(data['serverId']) + '  ' + str(data) + '  ' + str(data['node_feature']) + ' ' + str(testNodeFeatures.get(node, 0)) + '\n')
-                    # if (int(node)%4) != data['serverId'] or data is None:
-                    #     with open('khop_neighborhood_msg_wrong_server', 'a') as f:
-                    #         f.write(str(node) + ' ' + str(data['serverId']) + '  ' + str(data) + '  ' + str(data['node_feature']) + ' ' + str(testNodeFeatures.get(node, 0)) + '\n')
                     if j < k - 1:
                         node_neighbors_set.update(data['neighborhood'])
                     sums += data['node_feature']
         except Exception as e:
             with open('khop_neighborhood', 'a') as f:
-                f.write(str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
+                f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
         return sums
     
     def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
@@ -195,7 +192,6 @@ class Worker:
             if self.epoch[node] < target_epoch:
                 future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
                 concurrent.futures.wait(future)
-                # futures.append(future)
 
     def handle_msg(self, message):
         request_data = json.loads(message)
@@ -323,8 +319,6 @@ class Worker:
                 k = request_data['graph_weight_async']['k']
                 deltas = request_data['graph_weight_async']['deltas']
 
-                # Since the update of the future list in `aggregate_neighborhood_async` may not be timely, 
-                # we need to judge the both futures and epoch to ensure that no new futures will be added.
                 while target_epoch > min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
                     # print('do one more time')
                     self.aggregate_neighborhood_async(target_epoch, k, deltas)
@@ -347,17 +341,19 @@ class Worker:
         return request_json
         
 def handle_client(client_socket, worker):
-    data = client_socket.recv(102400)
-    print('get msg:', data)
-    
-    if b'__TELL__' not in data:
-        message = worker.handle_msg(data.decode())
-        print('send out:', message)
-        client_socket.send(message.encode())
-    else:
-        worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
-    # client_socket.shutdown(socket.SHUT_RDWR)
-    client_socket.close()
+    try:
+        data = client_socket.recv(102400)
+        print('get msg:', data)
+        
+        if b'__TELL__' not in data:
+            message = worker.handle_msg(data.decode())
+            print('send out:', message)
+            client_socket.send(message.encode())
+        else:
+            worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
+        # client_socket.shutdown(socket.SHUT_RDWR)
+    finally:
+        client_socket.close()
 
 def ask(node, msg):
     while True:
@@ -376,10 +372,15 @@ def ask(node, msg):
             client_socket.shutdown(socket.SHUT_RDWR)
             client_socket.close()
             return data
-        except (ConnectionRefusedError):
+        except ConnectionRefusedError:
             # print('ask error')
             client_socket.close()
             continue
+        except OSError:
+            client_socket.close()
+            continue
+        finally:
+            client_socket.close()
     
 
 def tell(server, msg):
@@ -395,10 +396,15 @@ def tell(server, msg):
             client_socket.shutdown(socket.SHUT_RDWR)
             client_socket.close()
             break
-        except (ConnectionRefusedError):
+        except ConnectionRefusedError:
             # print('tell error')
             client_socket.close()
             continue
+        except OSError:
+            client_socket.close()
+            continue
+        finally:
+            client_socket.close()
 
 def start_worker(wid, port):
     worker = Worker(wid)
@@ -408,7 +414,7 @@ def start_worker(wid, port):
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     server_socket.bind((host, port))
-    server_socket.listen(1000)
+    server_socket.listen(3000)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         while True:
             client_socket, _ = server_socket.accept()

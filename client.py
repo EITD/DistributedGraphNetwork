@@ -95,15 +95,15 @@ response = ''
 
 # response = train_synchronize(2, 2, [100, 100])
 
-response = train_synchronize(5, 1, 10)
+# response = train_synchronize(2, 2, [5000, 5000**2])
 
 # response = train_asynchronize(2, 2, [100, 100])
 
 # response = train_synchronize(2, 2, [5000, 5000**2])
 
-# response = train_asynchronize(2, 2, [5000, 5000**2])
+response = train_asynchronize(2, 2, [5000, 5000**2])
 
-# response = train_asynchronize(5, 1, 1)
+# response = train_asynchronize(2, 1, 5000)
 
 # with open('check', 'a') as f: 
 #     f.write('\n\n\n\n' + str(json.loads(response)['epoch_dict'])) 

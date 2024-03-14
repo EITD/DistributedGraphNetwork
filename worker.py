@@ -412,14 +412,14 @@ def tell(server, msg):
         finally:
             client_socket.close()
 
-def start_worker(wid, host, port):
+def start_worker(wid):
     worker = Worker(wid)
     worker.load_node_data()
     worker.load_graph_dict()
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    server_socket.bind((host, port))
+    server_socket.bind(serverDict.get(int(wid) % NUM_PARTITIONS))
     server_socket.listen(3000)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         while True:
@@ -427,4 +427,4 @@ def start_worker(wid, host, port):
             executor.submit(handle_client, client_socket, worker)
 
 if __name__ == "__main__":
-    start_worker(sys.argv[1], host, 12345 + int(sys.argv[1]))
+    start_worker(sys.argv[1])

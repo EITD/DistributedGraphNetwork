@@ -10,9 +10,9 @@ import concurrent.futures
 
 NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
-host = 'localhost'
-testIp = host
-serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
+# host = 'localhost'
+# testIp = host
+serverDict = {0:('130.229.183.193',12345), 1:('130.229.153.122',12346), 2:('130.229.153.122',12347), 3:('130.229.153.122',12348)}
 NODE_DEFAULT_FEATURE = 0
 
 class NodeForOtherWorker(Exception):
@@ -419,7 +419,7 @@ def start_worker(wid, port):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    server_socket.bind((host, port))
+    server_socket.bind(serverDict.get(int(wid)))
     server_socket.listen(3000)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         while True:

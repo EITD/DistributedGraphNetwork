@@ -8,7 +8,7 @@ def ask(msg):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-    client_socket.connect(('localhost',12345))
+    client_socket.connect(('130.229.183.193',12345))
     
     start = time.time()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start)), end=' ')

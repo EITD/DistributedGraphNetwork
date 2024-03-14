@@ -6,7 +6,7 @@ from decorators import timeit
 
 # graph all edges from 4 partition
 all_graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
-host = 'http://192.168.1.101:12345'
+host = 'http://130.229.183.193:12345'
 
 @timeit
 def send_message(message):
@@ -99,11 +99,21 @@ def train_asynchronize(epochs, k, deltas):
     
 # query_khop_neighborhood(3, 3, [5000, 5000 ** 2, 5000 ** 3])
 
+# train_synchronize(1, 1, 5000)
+    
+# train_synchronize(1, 2, [5000, 5000 ** 2])
+    
 # train_synchronize(2, 1, 5000)
     
-train_synchronize(1, 2, [5000, 5000 ** 2])
+# train_synchronize(2, 2, [5000, 5000 ** 2])
+    
+# train_asynchronize(1, 1, 5000)
+
+# train_asynchronize(2, 1, 5000)
 
 # train_asynchronize(1, 2, [5000, 5000 ** 2])
+
+train_asynchronize(2, 2, [5000, 5000 ** 2])
 
 # train_asynchronize(5, 1, 1)
 

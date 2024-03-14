@@ -18,7 +18,7 @@ NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
 # node without feature default value
 NODE_DEFAULT_FEATURE = 0
-server_list = ['192.168.1.101', '192.168.1.101', '192.168.1.101', '192.168.1.101']
+server_list = ['130.229.183.193', '130.229.153.122', '130.229.153.122', '1130.229.153.122']
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -28,7 +28,7 @@ class Worker:
     node_data = {}
     graph = {}
     epoch = {}
-    # update = False
+    update = False
 
     def __init__(self, wid):
         self.worker_id = int(wid)
@@ -361,7 +361,11 @@ class Worker:
 
             while target_epoch > min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id):
                 # print('do one more time')
-                self.aggregate_neighborhood_async(target_epoch, k, deltas)
+                if self.update:
+                    self.aggregate_neighborhood_async(target_epoch, k, deltas)
+                    self.update = False
+                else:
+                    sleep(0.5)
 
             request_data = {
                 'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
@@ -373,6 +377,7 @@ class Worker:
 
             if epoch > self.epoch[node]:
                 self.epoch[node] = epoch
+                self.update = True
             
             # self.update = True
             # 如果更新的是最小的epoch，就把update改成true。

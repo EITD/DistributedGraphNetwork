@@ -18,7 +18,7 @@ NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
 # node without feature default value
 NODE_DEFAULT_FEATURE = 0
-server_list = ['130.229.183.193', '130.229.153.122', '130.229.153.122', '1130.229.153.122']
+server_list = ['130.229.183.193', '130.229.153.122', '130.229.153.122', '130.229.153.122']
 
 class NodeForOtherWorker(Exception):
     def __init__(self):

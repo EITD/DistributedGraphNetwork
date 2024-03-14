@@ -10,9 +10,10 @@ import concurrent.futures
 
 NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
-host = '130.229.153.122'
-# testIp = host
-serverDict = {0:('130.229.183.193',12345), 1:('130.229.153.122',12346), 2:('130.229.153.122',12347), 3:('130.229.153.122',12348)}
+host = 'localhost'
+testIp = host
+# serverDict = {0:('130.229.183.193',12345), 1:('130.229.153.122',12346), 2:('130.229.153.122',12347), 3:('130.229.153.122',12348)}
+serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
 NODE_DEFAULT_FEATURE = 0
 
 class NodeForOtherWorker(Exception):

@@ -28,7 +28,7 @@ class Worker:
     node_data = {}
     graph = {}
     epoch = {}
-    update = False
+    update = True
 
     def __init__(self, wid):
         self.worker_id = int(wid)

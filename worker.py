@@ -12,7 +12,6 @@ NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
 host = 'localhost'
 testIp = host
-# serverDict = {0:('130.229.183.193',12345), 1:('130.229.153.122',12346), 2:('130.229.153.122',12347), 3:('130.229.153.122',12348)}
 serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
 NODE_DEFAULT_FEATURE = 0
 
@@ -357,12 +356,12 @@ def handle_client(client_socket, worker):
             client_socket.send(message.encode())
         else:
             worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
-            
-        # client_socket.shutdown(socket.SHUT_RDWR)
     finally:
+        client_socket.shutdown(socket.SHUT_RDWR)
         client_socket.close()
 
 def ask(node, msg):
+    print('ask:', msg)
     while True:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -370,7 +369,6 @@ def ask(node, msg):
         try:
             client_socket.connect(serverDict.get(int(node) % NUM_PARTITIONS))
             client_socket.send(msg.encode())
-            print('ask:', msg)
             
             data = client_socket.recv(102400).decode()
             
@@ -380,17 +378,23 @@ def ask(node, msg):
             client_socket.close()
             return data
         except ConnectionRefusedError:
-            # print('ask error')
+            print('ask connection error')
             client_socket.close()
             continue
         except OSError:
+            print('ask os error')
             client_socket.close()
+            sleep(1)
             continue
+        # except Exception as e:
+        #     with open('ask', 'a') as f:
+        #         f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
         finally:
             client_socket.close()
     
 
 def tell(server, msg):
+    print('tell:', msg)
     while True:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -398,29 +402,33 @@ def tell(server, msg):
         try:
             client_socket.connect(serverDict.get(int(server) % NUM_PARTITIONS))
             client_socket.send(b'__TELL__'+msg.encode())
-            print('tell:', msg)
             
             client_socket.shutdown(socket.SHUT_RDWR)
             client_socket.close()
             break
         except ConnectionRefusedError:
-            # print('tell error')
+            print('tell connection error')
             client_socket.close()
             continue
-        except OSError:
+        except OSError as e:
+            print('tell os error')
             client_socket.close()
+            sleep(1)
             continue
+        # except Exception as e:
+        #     with open('tell', 'a') as f:
+        #         f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
         finally:
             client_socket.close()
 
-def start_worker(wid):
+def start_worker(wid, port):
     worker = Worker(wid)
     worker.load_node_data()
     worker.load_graph_dict()
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    server_socket.bind(serverDict.get(int(wid) % NUM_PARTITIONS))
+    server_socket.bind((host, port))
     server_socket.listen(3000)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         while True:
@@ -428,4 +436,4 @@ def start_worker(wid):
             executor.submit(handle_client, client_socket, worker)
 
 if __name__ == "__main__":
-    start_worker(sys.argv[1])
+    start_worker(sys.argv[1], 12345 + int(sys.argv[1]))

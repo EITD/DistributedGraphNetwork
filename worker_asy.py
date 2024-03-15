@@ -50,48 +50,34 @@ class Vertex:
     def __init__(self, node, feature, in_edges, out_edges):
         self.port = 12345 + int(node)
         self.feature = [feature]
-        self.in_edges = list(in_edges)
-        self.out_edges = list(out_edges)
+        self.in_edges_dict = {i:[] for i in list(in_edges)}
+        self.out_edges_dict = {i:[] for i in list(out_edges)}
+        self.inbox = []
         
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         server_socket.bind((host, self.port))
-        server_socket.listen(3000)
+        server_socket.listen(5000)
         with concurrent.futures.ThreadPoolExecutor() as executor:
             while True:
                 client_socket, _ = server_socket.accept()
                 executor.submit(self.handle_client, client_socket)
-            
-    def handle_client(client_socket, worker):
-        try:
-            data = client_socket.recv(102400)
-            print('get msg:', data)
-            
-            if b'__MARKER__' not in data:
-                message = worker.handle_msg(data.decode())
-                print('send out:', message)
-                client_socket.send(message.encode())
-            else:
-                worker.handle_msg(data.replace(b'__MARKER__', b'', 1).decode())
-        finally:
-            # client_socket.shutdown(socket.SHUT_RDWR)
-            client_socket.close()
         
-    def node_feature(self, epoch):
+    def get(self, epoch):
         try:
             return self.feature[epoch]
         except IndexError:
             return None
         
-    def feature_and_neighborhood(self, nid, delta, epoch):
-        node_neighbors_list = list()
-        if nid in self.node_data.keys():
-            node_neighbors_list = list(self.graph.neighbors(nid))
-        random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
+    # def feature_and_neighborhood(self, nid, delta, epoch):
+    #     node_neighbors_list = list()
+    #     if nid in self.node_data.keys():
+    #         node_neighbors_list = list(self.graph.neighbors(nid))
+    #     random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
         
-        return self.node_feature(nid, epoch), random_neighbors
+    #     return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, nid, k, deltas):
         try:
@@ -161,12 +147,6 @@ class Vertex:
                 f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
         return sums
     
-    def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            for node in list(self.node_data.keys()):
-                executor.submit(self.update_node_epoch_sync, node, k, deltas)
-        return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-    
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         minEpoch = min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id)
         filter_nodes_1 = self.filter_nodes(minEpoch + 1)
@@ -183,28 +163,6 @@ class Vertex:
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
-    
-    def update_node_epoch_sync(self, node, k, deltas):
-        new_feature = self.khop_neighborhood(node, k, deltas)
-        
-        history = self.node_data.get(node, {})
-        my_epoch = sorted(list(history.keys()), reverse=True)[0]
-        history[my_epoch + 1] = new_feature
-
-        self.epoch[node] += 1
-        
-        request_data = {
-            'update_node_epoch': {
-                'nid': node,
-                'epoch': self.epoch[node]
-            }
-        }
-        request_json = json.dumps(request_data)
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            for server in range(4):
-                if server != self.worker_id:
-                    executor.submit(tell, server, request_json)
     
     def update_node_epoch_async(self, node, target_epoch, k, deltas, executor):
         new_feature = self.khop_neighborhood(node, k, deltas)
@@ -223,7 +181,7 @@ class Vertex:
                 }
             }
             request_json = json.dumps(request_data)
-
+            
             with concurrent.futures.ThreadPoolExecutor() as broadcast:
                 for server in range(4):
                     if server != self.worker_id:
@@ -232,6 +190,21 @@ class Vertex:
             if self.epoch[node] < target_epoch:
                 future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
                 concurrent.futures.wait(future)
+    
+    def handle_client(self, client_socket):
+        try:
+            data = client_socket.recv(102400)
+            print('get msg:', data)
+            
+            if b'__MARKER__' not in data:
+                message = self.handle_msg(data.decode())
+                print('send out:', message)
+                client_socket.send(message.encode())
+            else:
+                self.handle_msg(data.replace(b'__MARKER__', b'', 1).decode())
+        finally:
+            # client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.close()
 
     def handle_msg(self, message):
         request_data = json.loads(message)

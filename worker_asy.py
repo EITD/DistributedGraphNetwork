@@ -19,11 +19,12 @@ class NodeForOtherWorker(Exception):
     def __init__(self):
         pass
 
-class Marker:
-    def __init__(self):
-        pass
+# class Marker:
+#     def __init__(self):
+#         pass
 
 class Worker:
+    worker_id = None
     vertexDict = {}
     
     def __init__(self, wid):
@@ -35,7 +36,6 @@ class Worker:
             lines = file.readlines()
         for line in lines:
             parts = line.strip().split()[:2]
-            self.epoch[parts[0]] = 0
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
                 out_edges = graph.successors(parts[0])
                 in_edges = graph.predecessors(parts[0])
@@ -47,19 +47,43 @@ class Worker:
                 e.submit(vertex.train, )
 
 class Vertex:
-    worker_id = None
-    node_data = {}
-    graph = {}
-    epoch = {}
-    updateFlag = True
-
     def __init__(self, node, feature, in_edges, out_edges):
         self.port = 12345 + int(node)
         self.feature = [feature]
+        self.in_edges = list(in_edges)
+        self.out_edges = list(out_edges)
         
-    def node_feature(self, nid, epoch):
-        history = self.node_data.get(nid, {})
-        return history.get(epoch, NODE_DEFAULT_FEATURE)
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+        server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        server_socket.bind((host, self.port))
+        server_socket.listen(3000)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            while True:
+                client_socket, _ = server_socket.accept()
+                executor.submit(self.handle_client, client_socket)
+            
+    def handle_client(client_socket, worker):
+        try:
+            data = client_socket.recv(102400)
+            print('get msg:', data)
+            
+            if b'__MARKER__' not in data:
+                message = worker.handle_msg(data.decode())
+                print('send out:', message)
+                client_socket.send(message.encode())
+            else:
+                worker.handle_msg(data.replace(b'__MARKER__', b'', 1).decode())
+        finally:
+            # client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.close()
+        
+    def node_feature(self, epoch):
+        try:
+            return self.feature[epoch]
+        except IndexError:
+            return None
         
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
@@ -361,20 +385,6 @@ class Vertex:
         
         return request_json
         
-def handle_client(client_socket, worker):
-    try:
-        data = client_socket.recv(102400)
-        print('get msg:', data)
-        
-        if b'__TELL__' not in data:
-            message = worker.handle_msg(data.decode())
-            print('send out:', message)
-            client_socket.send(message.encode())
-        else:
-            worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
-    finally:
-        # client_socket.shutdown(socket.SHUT_RDWR)
-        client_socket.close()
 
 def ask(node, msg):
     print('ask:', msg)
@@ -439,20 +449,5 @@ def tell(server, msg):
         finally:
             client_socket.close()
 
-def start_worker(wid, port):
-    worker = Worker(wid)
-    worker.load_node_data()
-    worker.load_graph_dict()
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-    server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    server_socket.bind((host, port))
-    server_socket.listen(3000)
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        while True:
-            client_socket, _ = server_socket.accept()
-            executor.submit(handle_client, client_socket, worker)
-
 if __name__ == "__main__":
-    start_worker(sys.argv[1], 12345 + int(sys.argv[1]))
+    worker = Worker(sys.argv[1])

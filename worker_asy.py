@@ -11,8 +11,6 @@ import concurrent.futures
 NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
 host = 'localhost'
-testIp = host
-serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
 NODE_DEFAULT_FEATURE = 0
 
 class NodeForOtherWorker(Exception):
@@ -41,11 +39,6 @@ class Worker:
                 in_edges = graph.predecessors(parts[0])
                 self.vertexDict[12345 + int(parts[0])] = Vertex(parts[0], int(parts[1]), in_edges, out_edges)
 
-    def do(self):
-        with concurrent.futures.ProcessPoolExecutor() as e:
-            for vid, vertex in self.vertexDict.iteritems():
-                e.submit(vertex.train, )
-
 class Vertex:
     def __init__(self, node, feature, in_edges, out_edges):
         self.port = 12345 + int(node)
@@ -60,7 +53,7 @@ class Vertex:
         server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         server_socket.bind((host, self.port))
         server_socket.listen(5000)
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             while True:
                 client_socket, _ = server_socket.accept()
                 executor.submit(self.handle_client, client_socket)
@@ -181,7 +174,7 @@ class Vertex:
                 }
             }
             request_json = json.dumps(request_data)
-            
+
             with concurrent.futures.ThreadPoolExecutor() as broadcast:
                 for server in range(4):
                     if server != self.worker_id:

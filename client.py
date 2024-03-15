@@ -1,53 +1,38 @@
 import json
-import xmlrpc.client
-import threading
-from ConvertFile import ConvertFile
-from decorators import timeit
+import sys
+import time
 
-# graph all edges from 4 partition
-all_graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
-host = 'http://130.229.183.193:12345'
+def ask(msg):
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-@timeit
-def send_message(message):
-    # default send to worker 0
-    proxy = xmlrpc.client.ServerProxy(host)
-    print("Send message: ", message)
-    response = proxy.handle_msg(message)
-    print(f"Server response: {response}")
+    client_socket.connect(('localhost',12345))
     
-    # long response write into file
-    with open('check', 'w') as f: 
-        f.write(str(json.loads(response)['epoch_dict'])) 
+    start = time.time()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start)), end=' ')
+    
+    client_socket.send(msg.encode())
+    print('ask:', msg)
+    
+    data = client_socket.recv(102400).decode()
+    
+    end = time.time()
+    print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end)), end=' ')
+    
+    print('get reply:', data)
 
-    # train test
-    # test_mult_epochs(response, epoch)
-    # test_all_neighbors(response)
-
-# when node feature all 1(load dummmy), default is 2 ** epoch, multiple epochs, k = 1, deltas = [1]
-def test_mult_epochs(response, epoch):
-    dic = json.loads(response)['epoch_dict']
-    for key, value in dic.items():
-            if 2 ** epoch != value:
-                    print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
-
-# when node feature all 1(load dummmy), default is 1, epoch = 1, k = 1, deltas = [5000]
-def test_all_neighbors(response):
-    data = json.loads(response)['epoch_dict']
-    for key, value in data.items():
-        sums = 1
-        neighborsList = list(all_graph.neighbors(key))
-        sums += len(neighborsList)
-        if sums != value:
-            print("Warning:", key, 'value:', value, 'should be:', sums)
-            
+    client_socket.close()
+    
+    print('duration:', end - start)
+    
+    return data
 
 def query_node_feature(nid):
     request_data = {
         'node_feature': str(nid)
     }
     request_json = json.dumps(request_data)
-    threading.Thread(target=send_message, args=(request_json,)).start()
+    return ask(request_json)
 
 def query_khop_neighborhood(nid, k, deltas):
     if type(deltas) is int:
@@ -60,7 +45,7 @@ def query_khop_neighborhood(nid, k, deltas):
         }
     }
     request_json = json.dumps(request_data)
-    threading.Thread(target=send_message, args=(request_json,)).start()
+    return ask(request_json)
     
 def train_synchronize(epochs, k, deltas):
     if type(deltas) is int:
@@ -73,7 +58,7 @@ def train_synchronize(epochs, k, deltas):
         }
     }
     request_json = json.dumps(request_data)
-    threading.Thread(target=send_message, args=(request_json,)).start()
+    return ask(request_json)
 
 def train_asynchronize(epochs, k, deltas):
     if type(deltas) is int:
@@ -86,35 +71,43 @@ def train_asynchronize(epochs, k, deltas):
         }
     }
     request_json = json.dumps(request_data)
-    threading.Thread(target=send_message, args=(request_json,)).start()
+    return ask(request_json)
 
+response = ''
 
-# query_node_feature(0)
+# response = query_node_feature(0)
 
-# query_node_feature(1)
+# response = query_node_feature(1)
 
-# query_khop_neighborhood(8, 2, [5000, 5000**2])
+# response = query_khop_neighborhood(4031, 2, [5000, 5000**2])
 
-# query_khop_neighborhood(3, 3, [2, 18, 32])
-    
-# query_khop_neighborhood(3, 3, [5000, 5000 ** 2, 5000 ** 3])
+# response = query_khop_neighborhood(3, 3, [2, 18, 32])
 
-# train_synchronize(1, 1, 5000)
-    
-# train_synchronize(1, 2, [5000, 5000 ** 2])
-    
-# train_synchronize(2, 1, 5000)
-    
-# train_synchronize(2, 2, [5000, 5000 ** 2])
-    
-# train_asynchronize(1, 1, 5000)
+# response = query_khop_neighborhood(0, 1, 5000)
 
-# train_asynchronize(2, 1, 5000)
+# response = train_synchronize(1, 1, 5000)
 
-# train_asynchronize(1, 2, [5000, 5000 ** 2])
+# response = train_asynchronize(1, 1, 5000)
 
-train_asynchronize(2, 2, [5000, 5000 ** 2])
+# response = train_synchronize(2, 1, 5000)
 
-# train_asynchronize(5, 1, 1)
+# response = train_asynchronize(2, 1, 5000)
 
-# train_asynchronize(1, 1, 5000)
+# response = train_asynchronize(2, 10, [1,2,3,4,5,6,7,8,9,10])
+
+# response = train_synchronize(2, 2, [100, 100])
+
+# response = train_synchronize(5, 2, [5000, 5000**2])
+
+response = train_asynchronize(5, 2, [5000, 5000**2])
+
+# response = train_asynchronize(2, 2, [100, 100])
+
+# response = train_synchronize(1, 2, [5000, 5000**2])
+
+# response = train_asynchronize(1, 2, [5000, 5000**2])
+
+# response = train_asynchronize(5, 2, [2,3])
+
+# with open('check', 'a') as f: 
+#     f.write('\n\n\n\n' + str(json.loads(response)['epoch_dict'])) 

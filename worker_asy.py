@@ -12,6 +12,7 @@ NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
 host = 'localhost'
 NODE_DEFAULT_FEATURE = 0
+serverDict = [host, host, host, host]
 
 class NodeForOtherWorker(Exception):
     def __init__(self):
@@ -43,7 +44,7 @@ class Vertex:
     def __init__(self, node, feature, in_edges, out_edges):
         self.port = 12345 + int(node)
         self.feature = [feature]
-        self.in_edges_dict = {i:[] for i in list(in_edges)}
+        self.in_edges_list = list(in_edges)
         self.out_edges_dict = {i:[] for i in list(out_edges)}
         self.inbox = []
         
@@ -57,7 +58,10 @@ class Vertex:
             while True:
                 client_socket, _ = server_socket.accept()
                 executor.submit(self.handle_client, client_socket)
-        
+    
+    def epoch(self):
+        return len(self.feature) - 1
+    
     def get(self, epoch):
         try:
             return self.feature[epoch]
@@ -74,11 +78,9 @@ class Vertex:
     
     def khop_neighborhood(self, nid, k, deltas):
         try:
-            sums = self.node_feature(nid, self.epoch[nid])
+            sums = self.get(self.epoch())
             
-            node_neighbors_set = set()
-            if nid in self.node_data.keys():
-                node_neighbors_set = set(self.graph.neighbors(nid))
+            node_neighbors_set = set(self.out_edges_dict.keys())
             
             for j in range(k): # [2,3,2]
                 random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
@@ -360,7 +362,7 @@ def ask(node, msg):
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         try:
-            client_socket.connect(serverDict.get(int(node) % NUM_PARTITIONS))
+            client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 12345 + int(node)))
             client_socket.send(msg.encode())
             
             data = client_socket.recv(102400).decode()
@@ -386,34 +388,34 @@ def ask(node, msg):
             client_socket.close()
     
 
-def tell(server, msg):
-    print('tell:', msg)
-    while True:
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-        client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        try:
-            client_socket.connect(serverDict.get(int(server) % NUM_PARTITIONS))
-            client_socket.send(b'__TELL__'+msg.encode())
+# def tell(server, msg):
+#     print('tell:', msg)
+#     while True:
+#         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+#         client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+#         try:
+#             client_socket.connect(serverDict[int(server) % NUM_PARTITIONS])
+#             client_socket.send(b'__TELL__'+msg.encode())
             
-            client_socket.shutdown(socket.SHUT_RDWR)
-            client_socket.close()
-            break
-        except ConnectionRefusedError:
-            print('tell connection error')
-            client_socket.close()
-            continue
-        except OSError as e:
-            print('tell os error')
-            client_socket.close()
-            sleep(1)
-            continue
-        # except Exception as e:
-        #     with open('tell', 'a') as f:
-        #         f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
-        finally:
-            client_socket.close()
+#             client_socket.shutdown(socket.SHUT_RDWR)
+#             client_socket.close()
+#             break
+#         except ConnectionRefusedError:
+#             print('tell connection error')
+#             client_socket.close()
+#             continue
+#         except OSError as e:
+#             print('tell os error')
+#             client_socket.close()
+#             sleep(1)
+#             continue
+#         # except Exception as e:
+#         #     with open('tell', 'a') as f:
+#         #         f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
+#         finally:
+#             client_socket.close()
 
 if __name__ == "__main__":
     worker = Worker(sys.argv[1])

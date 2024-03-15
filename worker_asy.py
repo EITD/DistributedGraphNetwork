@@ -45,7 +45,8 @@ class Vertex:
         self.port = 12345 + int(node)
         self.feature = [feature]
         self.in_edges_list = list(in_edges)
-        self.out_edges_dict = {i:[] for i in list(out_edges)}
+        self.out_edges_list = list(out_edges)
+        self.epoch_dict = {}
         self.inbox = []
         
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -80,63 +81,40 @@ class Vertex:
         try:
             sums = self.get(self.epoch())
             
-            node_neighbors_set = set(self.out_edges_dict.keys())
+            node_neighbors_set = set(self.out_edges_list)
             
             for j in range(k): # [2,3,2]
                 random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
                 node_neighbors_set = set()
                 
-                for node in random_neighbors:
-                    node_epoch = self.epoch.get(node, self.epoch[nid])
-                    if node_epoch < self.epoch[nid]:
-                        return None
+                featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
                 
+                while None in featrueList:
+                    sleep(3)
+                    featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
+                
+                neighborhood_ask_list = []
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    feature_and_neighborhood_list = []
-                    feature_and_neighborhood_list_ask = []
                     for node in random_neighbors:
-                        if (int(node) % NUM_PARTITIONS) == self.worker_id:
-                            print(f'!!!self get: {node}!!!')
-                            if j < k - 1:
-                                future = executor.submit(self.feature_and_neighborhood, node, deltas[j + 1], self.epoch[nid])
-                            else: 
-                                future = executor.submit(self.node_feature, node, self.epoch[nid])
-                            feature_and_neighborhood_list.append(future)
-                        else:
-                            if j < k - 1:
-                                request_data = {
-                                    'feature_and_neighborhood' : {
-                                        'nid' : node,
-                                        'delta' : deltas[j + 1],
-                                        'epoch' : self.epoch[nid]
-                                    }
-                                }
-                                future = executor.submit(ask, node, json.dumps(request_data))
-                            else:
-                                request_data = {
-                                    'node_feature' : node,
+                        if j < k - 1:
+                            request_data = {
+                                'out_edges' : {
+                                    'delta' : deltas[j + 1],
                                     'epoch' : self.epoch[nid]
                                 }
-                                future = executor.submit(ask, node, json.dumps(request_data))
-                            feature_and_neighborhood_list_ask.append(future)
-                concurrent.futures.wait(feature_and_neighborhood_list)
-                concurrent.futures.wait(feature_and_neighborhood_list_ask)
-
-                node_neighbors_set = set()
+                            }
+                            future = executor.submit(ask, node, json.dumps(request_data))
+                        neighborhood_ask_list.append(future)
+                concurrent.futures.wait(neighborhood_ask_list)
                 
-                for future in feature_and_neighborhood_list:
-                    if j < k - 1:
-                        node_feature, neighborhood = future.result()
-                        node_neighbors_set.update(neighborhood)
-                    else:
-                        node_feature = future.result()
-                    sums += node_feature
-                for ask_future in feature_and_neighborhood_list_ask:
+                for featrue in featrueList:
+                    sums += featrue
+                
+                for ask_future in neighborhood_ask_list:
                     msg = ask_future.result()
                     data = json.loads(msg)
                     if j < k - 1:
                         node_neighbors_set.update(data['neighborhood'])
-                    sums += data['node_feature']
         except Exception as e:
             with open('khop_neighborhood', 'a') as f:
                 f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
@@ -230,10 +208,9 @@ class Vertex:
                     'node_feature' : sums if sums is not None else 'Not available.' # feature
                 }
                 
-            elif 'feature_and_neighborhood' in request_data:
-                nid = request_data['feature_and_neighborhood']['nid']
-                delta = request_data['feature_and_neighborhood']['delta']
-                epoch = request_data['feature_and_neighborhood']['epoch']
+            elif 'out_edges' in request_data:
+                delta = request_data['out_edges']['delta']
+                epoch = request_data['out_edges']['epoch']
                 
                 if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                     raise NodeForOtherWorker()

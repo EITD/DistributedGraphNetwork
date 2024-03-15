@@ -9,6 +9,7 @@ def ask(msg):
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
     client_socket.connect(('localhost',12345))
+    # client_socket.connect(('130.229.166.49',12345))
     
     start = time.time()
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start)), end=' ')
@@ -87,7 +88,7 @@ response = ''
 
 # response = query_khop_neighborhood(0, 1, 5000)
 
-# response = train_synchronize(1, 1, 5000)
+response = train_synchronize(1, 1, 5000)
 
 # response = train_asynchronize(1, 1, 5000)
 
@@ -101,7 +102,7 @@ response = ''
 
 # response = train_synchronize(5, 2, [5000, 5000**2])
 
-response = train_asynchronize(5, 2, [5000, 5000**2])
+# response = train_asynchronize(5, 2, [5000, 5000**2])
 
 # response = train_asynchronize(2, 2, [100, 100])
 

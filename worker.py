@@ -16,6 +16,10 @@ except NameError:
 NUM_PARTITIONS = 4
 # dummy file for test
 NODE_FEATURES = "./data/node_features.txt"
+# host = '130.229.152.41'
+# testIp = host
+# serverDict = {0:('130.229.166.49',12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
+
 host = 'localhost'
 testIp = host
 serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}

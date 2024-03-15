@@ -1,5 +1,6 @@
 import random
 import socket
+import struct
 import threading
 from time import sleep
 import traceback
@@ -365,6 +366,7 @@ def ask(node, msg):
     while True:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         try:
             client_socket.connect(serverDict.get(int(node) % NUM_PARTITIONS))
@@ -378,11 +380,11 @@ def ask(node, msg):
             client_socket.close()
             return data
         except ConnectionRefusedError:
-            # print('ask connection error')
+            print('ask connection error')
             client_socket.close()
             continue
         except OSError:
-            # print('ask os error')
+            print('ask os error')
             client_socket.close()
             sleep(1)
             continue
@@ -398,6 +400,7 @@ def tell(server, msg):
     while True:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         try:
             client_socket.connect(serverDict.get(int(server) % NUM_PARTITIONS))
@@ -407,11 +410,11 @@ def tell(server, msg):
             client_socket.close()
             break
         except ConnectionRefusedError:
-            # print('tell connection error')
+            print('tell connection error')
             client_socket.close()
             continue
         except OSError as e:
-            # print('tell os error')
+            print('tell os error')
             client_socket.close()
             sleep(1)
             continue
@@ -427,6 +430,7 @@ def start_worker(wid, port):
     worker.load_graph_dict()
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
     server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     server_socket.bind((host, port))
     server_socket.listen(3000)

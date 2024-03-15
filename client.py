@@ -1,6 +1,6 @@
 import json
-import sys
 import time
+import socket
 
 def ask(msg):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

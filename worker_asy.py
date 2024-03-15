@@ -218,39 +218,7 @@ class Vertex:
                 request_data = {
                     'out_edges' : sned # [nid, nid, nid...]
                 }
-            
-            elif 'neighborhood_aggregation_sync' in request_data:
-                final_epoch = request_data['neighborhood_aggregation_sync']['epochs']
-                k = request_data['neighborhood_aggregation_sync']['k']
-                deltas = request_data['neighborhood_aggregation_sync']['deltas']
-            
-                for epoch in range(1, final_epoch + 1):
-                    request_data = {
-                        'graph_weight_sync': {
-                            'target_epoch': epoch,
-                            'k': k,
-                            'deltas': deltas
-                        }
-                    }
-                    request_json = json.dumps(request_data)
-
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        futures = [executor.submit(ask, server, request_json) for server in range(4)]
-
-                    if epoch <= final_epoch:
-                        epoch_dict = {}
-                        for future in futures:
-                            try:
-                                response = future.result()
-                                request_data = json.loads(response)
-                                epoch_dict.update(request_data['graph_weight_sync'])
-                            except Exception as exc:
-                                print(f"neighborhood_aggregation generated an exception: {exc}")
-                    
-                request_data = {
-                    'epoch_dict' : epoch_dict
-                }
-
+                
             elif 'neighborhood_aggregation_async' in request_data:
                 final_epoch = request_data['neighborhood_aggregation_async']['epochs']
                 k = request_data['neighborhood_aggregation_async']['k']
@@ -281,21 +249,7 @@ class Vertex:
 
                 request_data = {
                     'epoch_dict' : epoch_dict
-                }    
-                        
-            elif 'graph_weight_sync' in request_data:
-                target_epoch = request_data['graph_weight_sync']['target_epoch']
-                k = request_data['graph_weight_sync']['k']
-                deltas = request_data['graph_weight_sync']['deltas']
-
-                if target_epoch <= sorted(list(set(self.epoch.values())))[0]:
-                    request_data = {
-                        'graph_weight_sync' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-                    } 
-                else:
-                    request_data = {
-                        'graph_weight_sync' : self.aggregate_neighborhood_sync(target_epoch, k, deltas)
-                    }
+                }
             
             elif 'graph_weight_async' in request_data:
                 target_epoch = request_data['graph_weight_async']['target_epoch']
@@ -312,16 +266,7 @@ class Vertex:
                 request_data = {
                     'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                 }
-            
-            elif 'update_node_epoch' in request_data:
-                node = request_data['update_node_epoch']['nid']
-                epoch = request_data['update_node_epoch']['epoch']
-                
-                if epoch > self.epoch[node]:
-                    self.epoch[node] = epoch
-                    self.updateFlag = True
 
-                return
             request_json = json.dumps(request_data)
         except NodeForOtherWorker:
             return ask(nid, message)

@@ -357,7 +357,7 @@ def handle_client(client_socket, worker):
         else:
             worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
     finally:
-        client_socket.shutdown(socket.SHUT_RDWR)
+        # client_socket.shutdown(socket.SHUT_RDWR)
         client_socket.close()
 
 def ask(node, msg):
@@ -378,11 +378,11 @@ def ask(node, msg):
             client_socket.close()
             return data
         except ConnectionRefusedError:
-            print('ask connection error')
+            # print('ask connection error')
             client_socket.close()
             continue
         except OSError:
-            print('ask os error')
+            # print('ask os error')
             client_socket.close()
             sleep(1)
             continue
@@ -407,11 +407,11 @@ def tell(server, msg):
             client_socket.close()
             break
         except ConnectionRefusedError:
-            print('tell connection error')
+            # print('tell connection error')
             client_socket.close()
             continue
         except OSError as e:
-            print('tell os error')
+            # print('tell os error')
             client_socket.close()
             sleep(1)
             continue

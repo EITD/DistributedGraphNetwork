@@ -7,9 +7,19 @@ from ConvertFile import ConvertFile
 import json
 import sys
 import concurrent.futures
+try:
+    profile
+except NameError:
+    def profile(func):
+        return func
 
 NUM_PARTITIONS = 4
+# dummy file for test
 NODE_FEATURES = "./data/node_features.txt"
+# host = '130.229.152.41'
+# testIp = host
+# serverDict = {0:('130.229.166.49',12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
+
 host = 'localhost'
 testIp = host
 serverDict = {0:(testIp,12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
@@ -18,45 +28,31 @@ NODE_DEFAULT_FEATURE = 0
 class NodeForOtherWorker(Exception):
     def __init__(self):
         pass
-
-class Marker:
-    def __init__(self):
-        pass
-
 class Worker:
-    vertexDict = {}
-    
-    def __init__(self, wid):
-        self.worker_id = int(wid)
-        
-        graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
-        
-        with open(NODE_FEATURES, 'r') as file:
-            lines = file.readlines()
-        for line in lines:
-            parts = line.strip().split()[:2]
-            self.epoch[parts[0]] = 0
-            if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
-                out_edges = graph.successors(parts[0])
-                in_edges = graph.predecessors(parts[0])
-                self.vertexDict[12345 + int(parts[0])] = Vertex(parts[0], int(parts[1]), in_edges, out_edges)
-
-    def do(self):
-        with concurrent.futures.ProcessPoolExecutor() as e:
-            for vid, vertex in self.vertexDict.iteritems():
-                e.submit(vertex.train, )
-
-class Vertex:
     worker_id = None
     node_data = {}
     graph = {}
     epoch = {}
     updateFlag = True
 
-    def __init__(self, node, feature, in_edges, out_edges):
-        self.port = 12345 + int(node)
-        self.feature = [feature]
+    def __init__(self, wid):
+        self.worker_id = int(wid)
+
+    @profile
+    def load_node_data(self):
+        with open(NODE_FEATURES, 'r') as file:
+            lines = file.readlines()
+        for line in lines:
+            parts = line.strip().split()[:2]
+            self.epoch[parts[0]] = 0
+            if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
+                self.node_data[parts[0]] = {0:int(parts[1])}
+
+    @profile
+    def load_graph_dict(self):
+        self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         
+    @profile   
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
         return history.get(epoch, NODE_DEFAULT_FEATURE)
@@ -69,6 +65,7 @@ class Vertex:
         
         return self.node_feature(nid, epoch), random_neighbors
     
+    @profile
     def khop_neighborhood(self, nid, k, deltas):
         try:
             sums = self.node_feature(nid, self.epoch[nid])

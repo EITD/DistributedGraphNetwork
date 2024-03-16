@@ -24,10 +24,11 @@ class NodeForOtherWorker(Exception):
 
 class Worker:
     worker_id = None
-    vertexDict = {}
+    # vertexDict = {}
     
     def __init__(self, wid):
         self.worker_id = int(wid)
+        # TODO: 加一个socket用来收feature
         
         graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
         
@@ -38,17 +39,25 @@ class Worker:
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
                 out_edges = graph.successors(parts[0])
                 in_edges = graph.predecessors(parts[0])
-                self.vertexDict[12345 + int(parts[0])] = Vertex(parts[0], int(parts[1]), in_edges, out_edges)
+                # self.vertexDict[12345 + int(parts[0])] = Vertex(parts[0], int(parts[1]), in_edges, out_edges)
+                Vertex(parts[0], int(parts[1]), in_edges, out_edges)
 
 class Vertex:
     def __init__(self, node, feature, in_edges, out_edges):
         self.port = 12345 + int(node)
-        self.feature = [feature]
+        self.sp = [feature] # [feature epoch 0, feature epoch 1, ...]
+        # self.feature = feature
+        # in_edges is Op in chandy lamport algorithm.
         self.in_edges_list = list(in_edges)
+        # out_edges is Ip in chandy lamport algorithm.
         self.out_edges_list = list(out_edges)
-        self.epoch_dict = {}
-        self.inbox = []
-        
+        # self.epoch_dict = {}
+        # n_f.append(inbox.pop) until '__MARKER__0'
+        self.neighbor_features = [] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
+        self.inbox = [] # [k, deltas, '__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
+        self.Mp = [] # [m, m, m, ...] this is part of inbox
+        self.Recorded = [] # [all out_edges]
+
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
@@ -61,11 +70,11 @@ class Vertex:
                 executor.submit(self.handle_client, client_socket)
     
     def epoch(self):
-        return len(self.feature) - 1
+        return len(self.sp) - 1
     
     def get(self, epoch):
         try:
-            return self.feature[epoch]
+            return self.sp[epoch]
         except IndexError:
             return None
         
@@ -78,45 +87,62 @@ class Vertex:
     #     return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self, k, deltas):
+        # self.neighbor_features = [[] for i in range(k)]
         try:
             sums = self.get(self.epoch())
             
             node_neighbors_set = set(self.out_edges_list)
+            # prefix = ""
             
             for j in range(k): # [2,3,2]
                 random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
                 node_neighbors_set = set()
-                
-                featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
-                
-                while None in featrueList:
-                    sleep(3)
-                    featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
-                
-                neighborhood_ask_list = []
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    for node in random_neighbors:
-                        if j < k - 1:
-                            request_data = {
-                                'out_edges' : {
-                                    'delta' : deltas[j + 1]
-                                }
-                            }
-                            future = executor.submit(ask, node, json.dumps(request_data))
-                        neighborhood_ask_list.append(future)
-                concurrent.futures.wait(neighborhood_ask_list)
-                
-                for featrue in featrueList:
-                    sums += featrue
-                
-                for ask_future in neighborhood_ask_list:
-                    msg = ask_future.result()
-                    data = json.loads(msg)
+
+                # TODO: 找到有j个v的字符串并且拿到该字符串v后的所有数字表示的feature
+                for vertex in random_neighbors:
+                    for feature in self.neighbor_features[j]:
+                        if feature.startsWith("v" + vertex):
+                            start_index = feature.find("f")
+                            sub_text = feature[start_index + 1:] 
+                            sums += int(sub_text)
                     if j < k - 1:
-                        node_neighbors_set.update(data['out_edges'])
+                        for v in self.neighbor_features[j + 1]:
+                            if feature.startsWith("v" + v):
+                                # start_index = len("v" + vertex)
+                                end_index = feature.find("f")
+                                sub_text = feature[1:end_index] 
+                                node_neighbors_set.add(sub_text)
+                
+                # featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
+                
+                # while None in featrueList:
+                #     sleep(3)
+                #     featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
+                
+                # neighborhood_ask_list = []
+                # with concurrent.futures.ThreadPoolExecutor() as executor:
+                #     for node in random_neighbors:
+                #         if j < k - 1:
+                #             request_data = {
+                #                 'out_edges' : {
+                #                     'delta' : deltas[j + 1]
+                #                 }
+                #             }
+                #             future = executor.submit(ask, node, json.dumps(request_data))
+                #         neighborhood_ask_list.append(future)
+                # concurrent.futures.wait(neighborhood_ask_list)
+                
+                # for featrue in featrueList:
+                #     sums += featrue
+                
+                # for ask_future in neighborhood_ask_list:
+                #     msg = ask_future.result()
+                #     data = json.loads(msg)
+                #     if j < k - 1:
+                #         node_neighbors_set.update(data['out_edges'])
         except Exception as e:
             with open('khop_neighborhood', 'a') as f:
-                f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
+                f.write(str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
         return sums
     
     # def aggregate_neighborhood_async(self, target_epoch, k, deltas):

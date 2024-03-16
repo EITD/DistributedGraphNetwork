@@ -370,7 +370,7 @@ def handle_client(client_socket, worker):
         else:
             worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
     finally:
-        # client_socket.shutdown(socket.SHUT_RDWR)
+        client_socket.shutdown(socket.SHUT_WR)
         client_socket.close()
 
 def ask(node, msg):
@@ -388,7 +388,7 @@ def ask(node, msg):
             
             print('get reply:', data)
 
-            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
             return data
         except ConnectionRefusedError:
@@ -418,7 +418,7 @@ def tell(server, msg):
             client_socket.connect(serverDict.get(int(server) % NUM_PARTITIONS))
             client_socket.send(b'__TELL__'+msg.encode())
             
-            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
             break
         except ConnectionRefusedError:

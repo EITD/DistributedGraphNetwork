@@ -46,34 +46,29 @@ class Worker:
             parts = line.strip().split()[:2]
             # self.epoch[parts[0]] = 0
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
-                # self.node_data[parts[0]] = {0:int(parts[1])}
-                self.node_data[parts[0]] = int(parts[1])
+                self.node_data[parts[0]] = {0:int(parts[1])}
 
     @profile
     def load_graph_dict(self):
         self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
         
     @profile   
-    # def node_feature(self, nid, epoch):
-    def node_feature(self, nid):
-        # history = self.node_data.get(nid, {})
-        # return history.get(epoch, NODE_DEFAULT_FEATURE)
-        return self.node_data.get(nid, NODE_DEFAULT_FEATURE)
+    def node_feature(self, nid, epoch):
+        history = self.node_data.get(nid, {})
+        return history.get(epoch, NODE_DEFAULT_FEATURE)
         
-    # def feature_and_neighborhood(self, nid, delta, epoch):
-    def feature_and_neighborhood(self, nid, delta):
+    def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
         if nid in self.node_data.keys():
             node_neighbors_list = list(self.graph.neighbors(nid))
         random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
         
-        # return self.node_feature(nid, epoch), random_neighbors
-        return self.node_feature(nid), random_neighbors
+        return self.node_feature(nid, epoch), random_neighbors
     
     @profile
-    def khop_neighborhood(self, nid, k, deltas):
+    def khop_neighborhood(self, nid, k, deltas, epoch):
         try:
-            sums = self.node_feature(nid)
+            sums = self.node_feature(nid, epoch)
             
             node_neighbors_set = set()
             if nid in self.node_data.keys():
@@ -95,11 +90,9 @@ class Worker:
                         if (int(node) % NUM_PARTITIONS) == self.worker_id:
                             # print(f'!!!self get: {node}!!!')
                             if j < k - 1:
-                                # future = executor.submit(self.feature_and_neighborhood, node, deltas[j + 1], self.epoch[nid])
-                                future = executor.submit(self.feature_and_neighborhood, node, deltas[j + 1])
+                                future = executor.submit(self.feature_and_neighborhood, node, deltas[j + 1], epoch)
                             else: 
-                                # future = executor.submit(self.node_feature, node, self.epoch[nid])
-                                future = executor.submit(self.node_feature, node)
+                                future = executor.submit(self.node_feature, node, epoch)
                             feature_and_neighborhood_list.append(future)
                         else:
                             if j < k - 1:
@@ -107,14 +100,14 @@ class Worker:
                                     'feature_and_neighborhood' : {
                                         'nid' : node,
                                         'delta' : deltas[j + 1],
-                                        # 'epoch' : self.epoch[nid]
+                                        'epoch' : epoch
                                     }
                                 }
                                 future = executor.submit(ask, node, json.dumps(request_data))
                             else:
                                 request_data = {
                                     'node_feature' : node,
-                                    # 'epoch' : self.epoch[nid]
+                                    'epoch' : epoch
                                 }
                                 future = executor.submit(ask, node, json.dumps(request_data))
                             feature_and_neighborhood_list_ask.append(future)
@@ -141,12 +134,11 @@ class Worker:
                 f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
         return sums
     
-    def aggregate_neighborhood_sync(self, k, deltas):
+    def aggregate_neighborhood_sync(self, k, deltas, epoch):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for node in list(self.node_data.keys()):
-                executor.submit(self.update_node_epoch_sync, node, k, deltas)
-        # return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
-        return self.node_data
+                executor.submit(self.update_node_epoch_sync, node, k, deltas, epoch)
+        return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == epoch}
 
     # def aggregate_neighborhood_async(self, target_epoch, k, deltas):
     #     minEpoch = min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id)
@@ -165,13 +157,12 @@ class Worker:
     #     return [node for node in list(self.node_data.keys())
     #             if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
-    def update_node_epoch_sync(self, node, k, deltas):
-        new_feature = self.khop_neighborhood(node, k, deltas)
+    def update_node_epoch_sync(self, node, k, deltas, epoch):
+        new_feature = self.khop_neighborhood(node, k, deltas, epoch - 1)
         
-        # history = self.node_data.get(node, {})
+        history = self.node_data.get(node, {})
         # my_epoch = sorted(list(history.keys()), reverse=True)[0]
-        # history[my_epoch + 1] = new_feature
-        self.node_data[node] = new_feature
+        history[epoch] = new_feature
 
         # self.epoch[node] += 1
         
@@ -222,13 +213,13 @@ class Worker:
             if 'node_feature' in request_data:
                 nid = request_data['node_feature']
                 # epoch = int(request_data.get('epoch', self.epoch.get(nid, 0)))
+                epoch = int(request_data.get('epoch', 0))
                 
                 if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                     raise NodeForOtherWorker()
                 
                 request_data = {
-                    # 'node_feature' : self.node_feature(nid, epoch)
-                    'node_feature' : self.node_feature(nid)
+                    'node_feature' : self.node_feature(nid, epoch)
                 }
                 
             elif 'khop_neighborhood' in request_data:
@@ -239,7 +230,7 @@ class Worker:
                 if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                     raise NodeForOtherWorker()
                 
-                sums = self.khop_neighborhood(nid, k, deltas)
+                sums = self.khop_neighborhood(nid, k, deltas, 0)
                 
                 request_data = {
                     'node_feature' : sums if sums is not None else 'Not available.'
@@ -248,13 +239,12 @@ class Worker:
             elif 'feature_and_neighborhood' in request_data:
                 nid = request_data['feature_and_neighborhood']['nid']
                 delta = request_data['feature_and_neighborhood']['delta']
-                # epoch = request_data['feature_and_neighborhood']['epoch']
+                epoch = request_data['feature_and_neighborhood']['epoch']
                 
                 if (int(nid) % NUM_PARTITIONS) != self.worker_id:
                     raise NodeForOtherWorker()
                 
-                # feature, neighborhoodSet = self.feature_and_neighborhood(nid, delta, epoch)
-                feature, neighborhoodSet = self.feature_and_neighborhood(nid, delta)
+                feature, neighborhoodSet = self.feature_and_neighborhood(nid, delta, epoch)
                 request_data = {
                     'node_feature' : feature, 
                     'neighborhood' : neighborhoodSet 
@@ -268,7 +258,7 @@ class Worker:
                 for epoch in range(1, final_epoch + 1):
                     request_data = {
                         'graph_weight_sync': {
-                            # 'target_epoch': epoch,
+                            'target_epoch': epoch,
                             'k': k,
                             'deltas': deltas
                         }
@@ -326,7 +316,7 @@ class Worker:
             #     }    
                         
             elif 'graph_weight_sync' in request_data:
-                # target_epoch = request_data['graph_weight_sync']['target_epoch']
+                target_epoch = request_data['graph_weight_sync']['target_epoch']
                 k = request_data['graph_weight_sync']['k']
                 deltas = request_data['graph_weight_sync']['deltas']
 
@@ -336,8 +326,7 @@ class Worker:
                 #     } 
                 # else:
                 request_data = {
-                    # 'graph_weight_sync' : self.aggregate_neighborhood_sync(target_epoch, k, deltas)
-                    'graph_weight_sync' : self.aggregate_neighborhood_sync(k, deltas)
+                    'graph_weight_sync' : self.aggregate_neighborhood_sync(k, deltas, target_epoch)
                 }
             
             # elif 'graph_weight_async' in request_data:
@@ -377,13 +366,13 @@ def handle_client(client_socket, worker):
         print('get msg:', data)
         
         # if b'__TELL__' not in data:
-            # message = worker.handle_msg(data.decode())
-            # print('send out:', message)
-            # client_socket.send(message.encode())
+        message = worker.handle_msg(data.decode())
+        print('send out:', message)
+        client_socket.send(message.encode())
         # else:
         #     worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
     finally:
-        # client_socket.shutdown(socket.SHUT_RDWR)
+        client_socket.shutdown(socket.SHUT_WR)
         client_socket.close()
 
 def ask(node, msg):
@@ -401,7 +390,7 @@ def ask(node, msg):
             
             print('get reply:', data)
 
-            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
             return data
         except ConnectionRefusedError:
@@ -431,7 +420,11 @@ def ask(node, msg):
 #             client_socket.connect(serverDict.get(int(server) % NUM_PARTITIONS))
 #             client_socket.send(b'__TELL__'+msg.encode())
             
-#             client_socket.shutdown(socket.SHUT_RDWR)
+#             Mac bug:
+#             阶段性关闭：当一方完成数据发送后，它首先使用shutdown(socket.SHUT_WR)来关闭写方向，表明已经发送完毕。这允许对方知道不会有更多的数据发送过来，但仍然可以继续发送数据到另一方。
+#             等待对方完成：当一方执行了写方向的关闭后，它继续从对方读取数据，直到收到对方的结束信号和/或直到对方也执行了写方向的关闭。
+#             全面关闭：在双方都执行了写方向的关闭，并且确认各自都接收到了对方的所有数据和关闭信号后，才执行shutdown(socket.SHUT_RDWR)或close()来完全关闭socket。
+#             client_socket.shutdown(socket.SHUT_WR)
 #             client_socket.close()
 #             break
 #         except ConnectionRefusedError:

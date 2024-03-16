@@ -101,16 +101,16 @@ class Vertex:
                 # TODO: 找到有j个v的字符串并且拿到该字符串v后的所有数字表示的feature
                 for vertex in random_neighbors:
                     for feature in self.neighbor_features[j]:
-                        if feature.startsWith("v" + vertex):
+                        if feature.startswith("v" + vertex):
                             start_index = feature.find("f")
                             sub_text = feature[start_index + 1:] 
                             sums += int(sub_text)
                     if j < k - 1:
                         for v in self.neighbor_features[j + 1]:
-                            if feature.startsWith("v" + v):
+                            if v.startswith("v" + vertex):
                                 # start_index = len("v" + vertex)
-                                end_index = feature.find("f")
-                                sub_text = feature[1:end_index] 
+                                end_index = v.find("f")
+                                sub_text = v[1:end_index] 
                                 node_neighbors_set.add(sub_text)
                 
                 # featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]

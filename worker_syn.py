@@ -7,11 +7,15 @@ from ConvertFile import ConvertFile
 import json
 import sys
 import concurrent.futures
+import platform
+
 try:
     profile
 except NameError:
     def profile(func):
         return func
+    
+system = platform.system()
 
 NUM_PARTITIONS = 4
 # dummy file for test
@@ -361,6 +365,7 @@ class Worker:
         return request_json
         
 def handle_client(client_socket, worker):
+    global system
     try:
         data = client_socket.recv(102400)
         print('get msg:', data)
@@ -372,7 +377,8 @@ def handle_client(client_socket, worker):
         # else:
         #     worker.handle_msg(data.replace(b'__TELL__', b'', 1).decode())
     finally:
-        client_socket.shutdown(socket.SHUT_WR)
+        if system == 'Darwin':
+            client_socket.shutdown(socket.SHUT_WR)
         client_socket.close()
 
 def ask(node, msg):

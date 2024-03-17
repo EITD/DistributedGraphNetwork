@@ -92,13 +92,22 @@ class Vertex:
             sums = self.get(self.epoch())
             
             node_neighbors_set = set(self.out_edges_list)
+            # node_neighbors_set = set(['v' + i for i in out_edges_list])
             # prefix = ""
             
             for j in range(k): # [2,3,2]
                 random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
                 node_neighbors_set = set()
 
-                # TODO: 找到有j个v的字符串并且拿到该字符串v后的所有数字表示的feature
+                # print(random_neighbors)
+                # for feature in self.neighbor_features[j]:
+                #         if feature[0:feature.rfind('f')] in random_neighbors:
+                #                 sums += int(feature[feature.rfind('f') + 1:])
+                
+                # if j < k - 1:
+                #         for feature in self.neighbor_features[j+1]:
+                #                 if feature[0:feature.rfind('v')] in random_neighbors:
+                #                         node_neighbors_set.add(feature[0:feature.rfind('f')])
                 for vertex in random_neighbors:
                     for feature in self.neighbor_features[j]:
                         if feature.startswith("v" + vertex):

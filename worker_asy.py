@@ -14,7 +14,7 @@ system = platform.system()
 NUM_PARTITIONS = 4
 K = 1
 DELTAS = [5000]
-NODE_FEATURES = "./data/node_features.txt"
+NODE_FEATURES = "./data_small/node_feature_small.txt"
 host = 'localhost'
 NODE_DEFAULT_FEATURE = 0
 serverDict = [host, host, host, host]
@@ -33,7 +33,7 @@ class Worker:
     def __init__(self, wid):
         self.worker_id = int(wid)
         
-        graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
+        graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
         
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
@@ -50,6 +50,7 @@ class Worker:
         sources = [n for n, d in graph.out_degree() if d == 0]
         for vertex in sources:
             if int(vertex) % NUM_PARTITIONS == self.worker_id:
+                self.vertex_number += 1
                 self.initial_vertex.append(vertex)
                 in_edges = graph.predecessors(vertex)
                 executor.submit(Vertex, vertex, 0, list(in_edges), [])
@@ -137,6 +138,9 @@ class Vertex:
         server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         server_socket.bind((host, self.port))
         server_socket.listen(5000)
+
+        print("start: ", self.id)
+
         exec = concurrent.futures.ThreadPoolExecutor()
         # fList = []
         for c in self.out_edges_list:
@@ -148,9 +152,9 @@ class Vertex:
             try:
                 data = client_socket.recv(102400)
                 print('vertex', self.id, ':', 'get msg:', data)
-                rep = self.toInbox(data.decode())
-                client_socket.send(rep.encode())
-                print('vertex', self.id, ':', 'reply msg:', rep)
+                self.toInbox(data.decode())
+                # client_socket.send(rep.encode())
+                # print('vertex', self.id, ':', 'reply msg:', rep)
             finally:
                 if system == 'Darwin':
                     client_socket.shutdown(socket.SHUT_WR)

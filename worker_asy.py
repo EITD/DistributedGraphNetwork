@@ -29,9 +29,6 @@ class Worker:
     vertex_number = 0
     initial_vertex = []
     target_epoch = ""
-
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    executor = concurrent.futures.ThreadPoolExecutor()
     
     def __init__(self, wid):
         self.worker_id = int(wid)
@@ -40,6 +37,7 @@ class Worker:
         
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
+        executor = concurrent.futures.ThreadPoolExecutor()
         for line in lines:
             parts = line.strip().split()[:2]
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
@@ -47,27 +45,40 @@ class Worker:
                 out_edges = graph.successors(parts[0])
                 in_edges = graph.predecessors(parts[0])
                 # self.vertexDict[12345 + int(parts[0])] = Vertex(parts[0], int(parts[1]), in_edges, out_edges)
-                if list(out_edges) == 0:
-                    self.initial_vertex.append(parts[0])
-                Vertex(parts[0], int(parts[1]), in_edges, out_edges)
+                executor.submit(Vertex, parts[0], int(parts[1]), list(in_edges), list(out_edges))
         
-        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-        self.server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        self.server_socket.bind((host, 10000 + self.worker_id))
-        self.server_socket.listen(5000)
+        sources = [n for n, d in graph.out_degree() if d == 0]
+        for vertex in sources:
+            if int(vertex) % NUM_PARTITIONS == self.worker_id:
+                self.initial_vertex.append(vertex)
+                in_edges = graph.predecessors(vertex)
+                executor.submit(Vertex, vertex, 0, list(in_edges), [])
         
-        self.executor.submit(self.handle_client)
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+        server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        server_socket.bind((host, 10000 + self.worker_id))
+        server_socket.listen(1500)
+        
+        # executor = concurrent.futures.ThreadPoolExecutor()
+        # self.handle_client(server_socket)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            while True:
+                client_socket, _ = server_socket.accept()       
+                executor.submit(self.handle_client_connection, client_socket)
 
-    def handle_client(self):
-        while True:
-            client_socket, _ = self.server_socket.accept()
-            self.executor(self.handle_client_connection, client_socket)
+    # def handle_client(self, server_socket):
+    #     print("handle_client")
+    #     with concurrent.futures.ThreadPoolExecutor() as executor:
+    #         while True:
+    #             client_socket, _ = server_socket.accept()       
+    #             executor.submit(self.handle_client_connection, client_socket)
     
     def handle_client_connection(self, client_socket):
         data = client_socket.recv(20480)
         message = data.decode()
-        # print('get msg:', data)
+        print('get msg:', data)
         if "epoch_" in message:
             self.target_epoch = message.split("_")[1]
             for e in range(int(self.target_epoch) + 1):
@@ -92,6 +103,7 @@ class Worker:
     
     def send_snapshot_to_initial_vertex(self, epoch):
         initial_vertex_notify_list = []
+        print(self.initial_vertex)
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for vertex in self.initial_vertex:
                 future = executor.submit(notify, vertex, f"snapshot_{epoch}")
@@ -106,9 +118,9 @@ class Vertex:
         # self.sp_snapshot = None # sp*
 
         # in_edges is Op in chandy lamport algorithm.
-        self.in_edges_list = list(in_edges)
+        self.in_edges_list = in_edges
         # out_edges is Ip in chandy lamport algorithm.
-        self.out_edges_list = list(out_edges)
+        self.out_edges_list = out_edges
         self.Enabled = self.out_edges_list # [all out_edges]
 
         # self.epoch_dict = {}
@@ -117,6 +129,7 @@ class Vertex:
         self.inbox = {out:[] for out in self.out_edges_list} # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
         # self.Mp = [] # [m, m, m, ...] this is part of inbox
         
+        # print(self.id)
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
@@ -128,6 +141,7 @@ class Vertex:
         for c in self.out_edges_list:
             exec.submit(self.handle_msg, c, self.inbox[c])
             # fList.append(future)
+        print(self.id)
         while True:
             client_socket, _ = server_socket.accept()
             try:
@@ -141,6 +155,7 @@ class Vertex:
         # concurrent.futures.wait(fList)
     
     def toInbox(self, message):
+        print(message)
         if "snapshot_" in message:
             parts = message.split("_")
             epoch = parts[1]
@@ -332,8 +347,9 @@ def notify(node, msg, worker=False):
             client_socket.close()
             # return data
         except ConnectionRefusedError:
-            print('notify connection error')
+            # print('notify connection error')
             client_socket.close()
+            sleep(100)
             continue
         except OSError:
             print('notify os error')

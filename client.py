@@ -3,11 +3,17 @@ import time
 import socket
 import concurrent.futures
 
-def ask(msg, i=0):
+def ask(msg, i=0, asy=False):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-    client_socket.connect(('localhost', 12345 + i))
+    try:
+        if asy:
+            client_socket.connect(('localhost', 10000 + i))
+        else:
+            client_socket.connect(('localhost', 12345 + i))
+    except Exception as e:
+        print(e)
     # client_socket.connect(('130.229.166.49',12345))
     
     start = time.time()
@@ -80,7 +86,7 @@ def train_asynchronize(epochs):
     ask_worker_list = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for i in range(4):
-            future = executor.submit(ask, f"epoch_{epochs}", i)
+            future = executor.submit(ask, f"epoch_{epochs}", i, True)
             ask_worker_list.append(future)
     concurrent.futures.wait(ask_worker_list)
     return "ok"
@@ -108,7 +114,7 @@ def train_asynchronize(epochs):
 
 # response = train_synchronize(2, 2, [100, 100])
 
-response = train_synchronize(2)
+response = train_asynchronize(1)
 print(response)
 
 # response = train_asynchronize(2, 2, [5000, 5000**2])

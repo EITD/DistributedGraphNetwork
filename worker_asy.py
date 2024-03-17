@@ -100,7 +100,7 @@ class Vertex:
         # self.epoch_dict = {}
         # n_f.append(inbox.pop) until '__MARKER__0'
         self.neighbor_features = [[] for i in range(K)] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
-        self.inbox = [] # [k, deltas, '__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
+        self.inbox = [] # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
         # self.Mp = [] # [m, m, m, ...] this is part of inbox
         
 
@@ -113,6 +113,7 @@ class Vertex:
         with concurrent.futures.ProcessPoolExecutor() as executor:
             while True:
                 client_socket, _ = server_socket.accept()
+
                 executor.submit(self.handle_client, client_socket)
     
     def epoch(self):
@@ -283,7 +284,7 @@ class Vertex:
                 initial_vertex_feature_list = []
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     for out in self.out_edges_list:
-                        future = executor.submit(ask, out, f"v{self.get(self.epoch())}")
+                        future = executor.submit(ask, out, f"v{self.id}f{self.get(self.epoch())}")
                         initial_vertex_feature_list.append(future)
                 concurrent.futures.wait(initial_vertex_feature_list)
 
@@ -305,6 +306,14 @@ class Vertex:
                 self.Enabled.remove(c)
 
                 if len(self.Enabled) == 0:
+                    # send self feature
+                    vertex_feature_list = []
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        for out in self.out_edges_list:
+                            future = executor.submit(ask, out, f"v{self.id}f{self.get(self.epoch())}")
+                            vertex_feature_list.append(future)
+                    concurrent.futures.wait(vertex_feature_list)
+
                     self.sp.append(self.khop_neighborhood())
                     self.neighbor_features = []
 
@@ -323,9 +332,19 @@ class Vertex:
         else:
             c = message[message.find('v') + 1 : message[1:].find('v') + 1]
             if c in self.Enabled:
-                pass
+                index = message.count('v')
+                self.neighbor_features[index - 1].append(message)
+
+                send_feature = f"v{self.id}" + message
+                neighbor_feature_list = []
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    for out in self.out_edges_list:
+                        future = executor.submit(ask, out, send_feature)
+                        neighbor_feature_list.append(future)
+                concurrent.futures.wait(neighbor_feature_list)
+
             else:
-                pass
+                self.inbox.append(message)
 
             # f"v{self.get(self.epoch())}" + feature
 

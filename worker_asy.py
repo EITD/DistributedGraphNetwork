@@ -148,7 +148,9 @@ class Vertex:
             try:
                 data = client_socket.recv(102400)
                 print('vertex', self.id, ':', 'get msg:', data)
-                self.toInbox(data.decode())
+                rep = self.toInbox(data.decode())
+                client_socket.send(rep.encode())
+                print('vertex', self.id, ':', 'reply msg:', rep)
             finally:
                 if system == 'Darwin':
                     client_socket.shutdown(socket.SHUT_WR)

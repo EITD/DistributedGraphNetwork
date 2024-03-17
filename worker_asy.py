@@ -7,6 +7,9 @@ from ConvertFile import ConvertFile
 import json
 import sys
 import concurrent.futures
+import platform
+
+system = platform.system()
 
 NUM_PARTITIONS = 4
 NODE_FEATURES = "./data/node_features.txt"
@@ -31,6 +34,7 @@ class Worker:
         # TODO: 加一个socket用来收feature
         
         graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
+        initial_vertex = []
         
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
@@ -40,7 +44,16 @@ class Worker:
                 out_edges = graph.successors(parts[0])
                 in_edges = graph.predecessors(parts[0])
                 # self.vertexDict[12345 + int(parts[0])] = Vertex(parts[0], int(parts[1]), in_edges, out_edges)
+                if list(out_edges) == 0:
+                    initial_vertex.append(parts[0])
                 Vertex(parts[0], int(parts[1]), in_edges, out_edges)
+        
+        initial_vertex_ask_list = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for vertex in initial_vertex:
+                future = executor.submit(ask, vertex, "snapshot")
+                initial_vertex_ask_list.append(future)
+        concurrent.futures.wait(initial_vertex_ask_list)
 
 class Vertex:
     def __init__(self, node, feature, in_edges, out_edges):
@@ -203,14 +216,15 @@ class Vertex:
             data = client_socket.recv(102400)
             print('get msg:', data)
             
-            if b'__MARKER__' not in data:
-                message = self.handle_msg(data.decode())
-                print('send out:', message)
-                client_socket.send(message.encode())
-            else:
-                self.handle_msg(data.replace(b'__MARKER__', b'', 1).decode())
+            # if b'__MARKER__' not in data:
+            self.handle_msg(data.decode())
+            # print('send out:', message)
+            # client_socket.send(message.encode())
+            # else:
+            #     self.handle_msg(data.replace(b'__MARKER__', b'', 1).decode())
         finally:
-            # client_socket.shutdown(socket.SHUT_RDWR)
+            if system == 'Darwin':
+                client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
 
     def handle_msg(self, message):
@@ -320,11 +334,11 @@ def ask(node, msg):
             client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 12345 + int(node)))
             client_socket.send(msg.encode())
             
-            data = client_socket.recv(102400).decode()
+            # data = client_socket.recv(102400).decode()
             
-            print('get reply:', data)
+            # print('get reply:', data)
 
-            client_socket.shutdown(socket.SHUT_RDWR)
+            client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
             return data
         except ConnectionRefusedError:
@@ -354,7 +368,7 @@ def ask(node, msg):
 #             client_socket.connect(serverDict[int(server) % NUM_PARTITIONS])
 #             client_socket.send(b'__TELL__'+msg.encode())
             
-#             client_socket.shutdown(socket.SHUT_RDWR)
+#             client_socket.shutdown(socket.SHUT_WR)
 #             client_socket.close()
 #             break
 #         except ConnectionRefusedError:

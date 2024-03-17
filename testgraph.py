@@ -15,7 +15,7 @@ else:
     print("Graph is not a DAG.")
 
 sources = [n for n, d in graph.out_degree() if d == 0]
-print("source vertex：", sources)
+print("source vertex:", sources)
 
 reachable = set()
 for source in sources:

@@ -85,20 +85,24 @@ class Worker:
 
 class Vertex:
     def __init__(self, node, feature, in_edges, out_edges):
+        self.id = node
         self.port = 12345 + int(node)
         self.sp = [feature] # [feature epoch 0, feature epoch 1, ...]
-        self.sp_snapshot = None # sp*
+        # self.sp_snapshot = None # sp*
         # self.feature = feature
+
         # in_edges is Op in chandy lamport algorithm.
         self.in_edges_list = list(in_edges)
         # out_edges is Ip in chandy lamport algorithm.
         self.out_edges_list = list(out_edges)
+        self.Enabled = self.out_edges_list # [all out_edges]
+
         # self.epoch_dict = {}
         # n_f.append(inbox.pop) until '__MARKER__0'
-        self.neighbor_features = [] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
+        self.neighbor_features = [[] for i in range(K)] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
         self.inbox = [] # [k, deltas, '__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
         # self.Mp = [] # [m, m, m, ...] this is part of inbox
-        self.Recorded = [] # [all out_edges]
+        
 
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -128,8 +132,7 @@ class Vertex:
         
     #     return self.node_feature(nid, epoch), random_neighbors
     
-    def khop_neighborhood(self, K, DELTAS):
-        # self.neighbor_features = [[] for i in range(k)]
+    def khop_neighborhood(self):
         try:
             sums = self.get(self.epoch())
             
@@ -156,7 +159,7 @@ class Vertex:
                             start_index = feature.find("f")
                             sub_text = feature[start_index + 1:] 
                             sums += int(sub_text)
-                    if j < k - 1:
+                    if j < K - 1:
                         for v in self.neighbor_features[j + 1]:
                             if v.startswith("v" + vertex):
                                 # start_index = len("v" + vertex)
@@ -267,32 +270,70 @@ class Vertex:
 
     def handle_msg(self, message):
         # request_data = json.loads(message)
-        
+
         # try:
-        if "snapshot" in message:
+        if "snapshot_" in message:
             parts = message.split("_")
             epoch = parts[1]
             
             self.record(self.get(self.epoch()))
 
+            # pass feature and then marker
             for e in range(epoch):
+                initial_vertex_feature_list = []
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    for out in self.out_edges_list:
+                        future = executor.submit(ask, out, f"v{self.get(self.epoch())}")
+                        initial_vertex_feature_list.append(future)
+                concurrent.futures.wait(initial_vertex_feature_list)
+
                 initial_vertex_marker_list = []
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     for out in self.out_edges_list:
-                        future = executor.submit(ask, out, f"marker_{e}")
+                        future = executor.submit(ask, out, f"marker_{e}_{self.id}")
                         initial_vertex_marker_list.append(future)
                 concurrent.futures.wait(initial_vertex_marker_list)
 
-        elif "marker_" in message:
-            pass
 
-        else: # upon <rcvd, m>
-            cqp = message[message.find('v') + 1 : message[1:].find('v') + 1]
-            if cqp not in self.Recorded:
+        elif "marker_" in message:
+            parts = message.split("_")
+            epoch = parts[1]
+            c = parts[2]
+
+            if c in self.Enabled:
+                self.record(self.get(self.epoch()))
+                self.Enabled.remove(c)
+
+                if len(self.Enabled) == 0:
+                    self.sp.append(self.khop_neighborhood())
+                    self.neighbor_features = []
+
+                    vertex_marker_list = []
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        for out in self.out_edges_list:
+                            future = executor.submit(ask, out, f"marker_{epoch}_{self.id}")
+                            vertex_marker_list.append(future)
+                    concurrent.futures.wait(vertex_marker_list)
+
+                    self.Enabled = self.out_edges_list
+            # messages are before marker, marker can't be in Disabled
+            else:
                 pass
+
+        else:
+            c = message[message.find('v') + 1 : message[1:].find('v') + 1]
+            if c in self.Enabled:
+                pass
+            else:
+                pass
+
+            # f"v{self.get(self.epoch())}" + feature
+
+            # if cqp not in self.Recorded:
+            #     pass
             
-            elif cqp in self.Recorded:
-                pass
+            # elif cqp in self.Recorded:
+            #     pass
 
         # if 'node_feature' in request_data:
         #     nid = request_data['node_feature']

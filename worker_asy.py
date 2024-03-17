@@ -100,7 +100,7 @@ class Vertex:
         # self.epoch_dict = {}
         # n_f.append(inbox.pop) until '__MARKER__0'
         self.neighbor_features = [[] for i in range(K)] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
-        self.inbox = [] # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
+        self.inbox = {out:[] for out in self.out_edges_list} # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
         # self.Mp = [] # [m, m, m, ...] this is part of inbox
         
 
@@ -113,7 +113,6 @@ class Vertex:
         with concurrent.futures.ProcessPoolExecutor() as executor:
             while True:
                 client_socket, _ = server_socket.accept()
-
                 executor.submit(self.handle_client, client_socket)
     
     def epoch(self):
@@ -250,7 +249,7 @@ class Vertex:
             print('get msg:', data)
             
             # if b'__MARKER__' not in data:
-            self.handle_msg(data.decode())
+            client_socket.send(self.handle_msg(data.decode()))
             # print('send out:', message)
             # client_socket.send(message.encode())
             # else:
@@ -271,6 +270,7 @@ class Vertex:
 
     def handle_msg(self, message):
         # request_data = json.loads(message)
+        
 
         # try:
         if "snapshot_" in message:
@@ -345,6 +345,8 @@ class Vertex:
 
             else:
                 self.inbox.append(message)
+        
+        return 'ok'
 
             # f"v{self.get(self.epoch())}" + feature
 

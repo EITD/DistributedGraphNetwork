@@ -37,7 +37,7 @@ class Worker:
         
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
-        executor = concurrent.futures.ThreadPoolExecutor()
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1500)
         for line in lines:
             parts = line.strip().split()[:2]
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:

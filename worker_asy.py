@@ -110,10 +110,33 @@ class Vertex:
         server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         server_socket.bind((host, self.port))
         server_socket.listen(5000)
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            while True:
-                client_socket, _ = server_socket.accept()
-                executor.submit(self.handle_client, client_socket)
+        exec = concurrent.futures.ThreadPoolExecutor()
+        fList = []
+        for c in self.out_edges_list:
+            future = exec.submit(self.handle_msg, c, self.inbox[c])
+            fList.append(future)
+        while True:
+            client_socket, _ = server_socket.accept()
+            try:
+                data = client_socket.recv(102400)
+                print('get msg:', data)
+                self.toInbox(data.decode())
+            finally:
+                if system == 'Darwin':
+                    client_socket.shutdown(socket.SHUT_WR)
+                client_socket.close()
+        # concurrent.futures.wait(fList)
+    
+    def toInbox(self, message):
+        if "snapshot_" in message:
+            return 'ok'
+        elif "marker_" in message:
+            _, _, c = message.split("_")
+        else:
+            c = message.split('f')[0].split('v')[1]
+        self.inbox[c].append(message)
+        
+        return 'ok'
     
     def epoch(self):
         return len(self.sp) - 1
@@ -123,14 +146,6 @@ class Vertex:
             return self.sp[epoch]
         except IndexError:
             return None
-        
-    # def feature_and_neighborhood(self, nid, delta, epoch):
-    #     node_neighbors_list = list()
-    #     if nid in self.node_data.keys():
-    #         node_neighbors_list = list(self.graph.neighbors(nid))
-    #     random_neighbors = random.sample(node_neighbors_list, delta if len(node_neighbors_list) > delta else len(node_neighbors_list))
-        
-    #     return self.node_feature(nid, epoch), random_neighbors
     
     def khop_neighborhood(self):
         try:
@@ -243,21 +258,6 @@ class Vertex:
     #             future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
     #             concurrent.futures.wait(future)
     
-    def handle_client(self, client_socket):
-        try:
-            data = client_socket.recv(102400)
-            print('get msg:', data)
-            
-            # if b'__MARKER__' not in data:
-            client_socket.send(self.handle_msg(data.decode()))
-            # print('send out:', message)
-            # client_socket.send(message.encode())
-            # else:
-            #     self.handle_msg(data.replace(b'__MARKER__', b'', 1).decode())
-        finally:
-            if system == 'Darwin':
-                client_socket.shutdown(socket.SHUT_WR)
-            client_socket.close()
 
     # def startRecording(self):
         # self.sp_snapshot = self.get(self.epoch())
@@ -268,7 +268,7 @@ class Vertex:
     def record(self, sp_snaposhot):
         pass
 
-    def handle_msg(self, message):
+    def handle_msg(self, c, messageList):
         # request_data = json.loads(message)
         
 
@@ -330,7 +330,7 @@ class Vertex:
                 pass
 
         else:
-            c = message[message.find('v') + 1 : message[1:].find('v') + 1]
+            c = message.split('f')[0].split('v')[1]
             if c in self.Enabled:
                 index = message.count('v')
                 self.neighbor_features[index - 1].append(message)

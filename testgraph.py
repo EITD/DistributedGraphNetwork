@@ -2,12 +2,12 @@ from ConvertFile import ConvertFile
 import networkx as nx
 
 
-graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
+graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
 
-out_edges = graph.successors('4031')
-in_edges = graph.predecessors('4031')
+# out_edges = graph.successors('4031')
+# in_edges = graph.predecessors('4031')
 
-print(len(list(out_edges)), len(list(in_edges)))
+# print(len(list(out_edges)), len(list(in_edges)))
 
 if nx.is_directed_acyclic_graph(graph):
     print("Graph is a DAG.")

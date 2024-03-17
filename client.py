@@ -1,12 +1,13 @@
 import json
 import time
 import socket
+import concurrent.futures
 
-def ask(msg):
+def ask(msg, i=0):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-    client_socket.connect(('localhost',12345))
+    client_socket.connect(('localhost', 12345 + i))
     # client_socket.connect(('130.229.166.49',12345))
     
     start = time.time()
@@ -21,6 +22,8 @@ def ask(msg):
     print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end)), end=' ')
     
     print('get reply:', data)
+    with open('check', 'a') as f: 
+        f.write('\n\n\n\n' + str(json.loads(data))) 
 
     client_socket.shutdown(socket.SHUT_WR)
     client_socket.close()
@@ -62,7 +65,7 @@ def train_synchronize(epochs, k, deltas):
     request_json = json.dumps(request_data)
     return ask(request_json)
 
-def train_asynchronize(epochs, k, deltas):
+def train_asynchronize(epochs):
     # if type(deltas) is int:
     #     deltas = [deltas]
     # request_data = {
@@ -73,9 +76,15 @@ def train_asynchronize(epochs, k, deltas):
     #     }
     # }
     # request_json = json.dumps(request_data)
-    return ask(epochs)
 
-response = ''
+    ask_worker_list = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for i in range(4):
+            future = executor.submit(ask, f"epoch_{epochs}", i)
+            ask_worker_list.append(future)
+    concurrent.futures.wait(ask_worker_list)
+    return "ok"
+
 
 # response = query_node_feature(0)
 
@@ -99,7 +108,8 @@ response = ''
 
 # response = train_synchronize(2, 2, [100, 100])
 
-response = train_synchronize(2, 2, [5000, 5000**2])
+response = train_synchronize(2)
+print(response)
 
 # response = train_asynchronize(2, 2, [5000, 5000**2])
 

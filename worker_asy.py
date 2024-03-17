@@ -166,20 +166,20 @@ class Vertex:
             self.record(epoch, self.get(self.epoch()))
 
             # pass feature and then marker
-            for e in range(epoch):
-                initial_vertex_feature_list = []
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    for out in self.in_edges_list:
-                        future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
-                        initial_vertex_feature_list.append(future)
-                concurrent.futures.wait(initial_vertex_feature_list)
+            # for e in range(epoch):
+            initial_vertex_feature_list = []
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for out in self.in_edges_list:
+                    future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
+                    initial_vertex_feature_list.append(future)
+            concurrent.futures.wait(initial_vertex_feature_list)
 
-                initial_vertex_marker_list = []
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    for out in self.in_edges_list:
-                        future = executor.submit(notify, out, f"marker_{e}_{self.id}")
-                        initial_vertex_marker_list.append(future)
-                concurrent.futures.wait(initial_vertex_marker_list)
+            initial_vertex_marker_list = []
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for out in self.in_edges_list:
+                    future = executor.submit(notify, out, f"marker_{epoch}_{self.id}")
+                    initial_vertex_marker_list.append(future)
+            concurrent.futures.wait(initial_vertex_marker_list)
 
             return 'ok'
         elif "marker_" in message:

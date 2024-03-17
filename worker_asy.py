@@ -148,9 +148,7 @@ class Vertex:
             try:
                 data = client_socket.recv(102400)
                 print('vertex', self.id, ':', 'get msg:', data)
-                rep = self.toInbox(data.decode())
-                client_socket.send(rep.encode())
-                print('vertex', self.id, ':', 'reply msg:', rep)
+                self.toInbox(data.decode())
             finally:
                 if system == 'Darwin':
                     client_socket.shutdown(socket.SHUT_WR)
@@ -158,7 +156,7 @@ class Vertex:
         # concurrent.futures.wait(fList)
     
     def toInbox(self, message):
-        print(message)
+        # print(message)
         if "snapshot_" in message:
             parts = message.split("_")
             epoch = parts[1]

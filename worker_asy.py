@@ -63,6 +63,7 @@ class Worker:
         
         # executor = concurrent.futures.ThreadPoolExecutor()
         # self.handle_client(server_socket)
+        print('worker', self.worker_id , 'ready!')
         with concurrent.futures.ThreadPoolExecutor() as executor:
             while True:
                 client_socket, _ = server_socket.accept()       
@@ -76,9 +77,9 @@ class Worker:
     #             executor.submit(self.handle_client_connection, client_socket)
     
     def handle_client_connection(self, client_socket):
-        data = client_socket.recv(20480)
+        data = client_socket.recv(102400)
         message = data.decode()
-        print('get msg:', data)
+        print('worker', self.worker_id, ':', 'get msg:', data)
         if "epoch_" in message:
             self.target_epoch = message.split("_")[1]
             for e in range(int(self.target_epoch) + 1):
@@ -97,8 +98,8 @@ class Worker:
             epoch = parts[3]
             if epoch == self.target_epoch:
                 self.vertexDict.update({nid: feature})
-
-        client_socket.shutdown(socket.SHUT_WR)
+        if system == 'Darwin':
+            client_socket.shutdown(socket.SHUT_WR)
         client_socket.close()
     
     def send_snapshot_to_initial_vertex(self, epoch):
@@ -141,13 +142,15 @@ class Vertex:
         for c in self.out_edges_list:
             exec.submit(self.handle_msg, c, self.inbox[c])
             # fList.append(future)
-        print(self.id)
+        # print(self.id)
         while True:
             client_socket, _ = server_socket.accept()
             try:
                 data = client_socket.recv(102400)
-                print('get msg:', data)
-                self.toInbox(data.decode())
+                print('vertex', self.id, ':', 'get msg:', data)
+                rep = self.toInbox(data.decode())
+                client_socket.send(rep.encode())
+                print('vertex', self.id, ':', 'reply msg:', rep)
             finally:
                 if system == 'Darwin':
                     client_socket.shutdown(socket.SHUT_WR)
@@ -345,11 +348,11 @@ def notify(node, msg, worker=False):
 
             client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
-            # return data
+            break
         except ConnectionRefusedError:
-            # print('notify connection error')
+            print('notify connection error')
             client_socket.close()
-            sleep(100)
+            # sleep(100)
             continue
         except OSError:
             print('notify os error')

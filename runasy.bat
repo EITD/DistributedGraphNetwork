@@ -7,4 +7,4 @@ start cmd /k python3 worker_asy.py 3
 
 timeout /t 5 /nobreak
 
-start cmd /k python3 client.py
+start cmd /k 

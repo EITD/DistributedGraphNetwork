@@ -13,6 +13,8 @@ import threading
 system = platform.system()
 
 NUM_PARTITIONS = 4
+K = 1
+DELTAS = [5000]
 NODE_FEATURES = "./data/node_features.txt"
 host = 'localhost'
 NODE_DEFAULT_FEATURE = 0
@@ -30,19 +32,12 @@ class Worker:
     worker_id = None
     # vertexDict = {}
     initial_vertex = []
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    executor = concurrent.futures.ThreadPoolExecutor()
     
     def __init__(self, wid):
         self.worker_id = int(wid)
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-        server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        server_socket.bind((host, 10000 + self.worker_id))
-        server_socket.listen(5000)
-        # TODO
-        server_thread = threading.Thread(target=self.handle_client)
-        server_thread.start()
-
+        
         graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
         
         with open(NODE_FEATURES, 'r') as file:
@@ -56,34 +51,37 @@ class Worker:
                 if list(out_edges) == 0:
                     self.initial_vertex.append(parts[0])
                 Vertex(parts[0], int(parts[1]), in_edges, out_edges)
-
-    def send_snapshot_to_initial_vertex(self, k, deltas):  
-        initial_vertex_ask_list = []
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            for vertex in self.initial_vertex:
-                future = executor.submit(ask, vertex, f"snapshot {k} {deltas}")
-                initial_vertex_ask_list.append(future)
-        concurrent.futures.wait(initial_vertex_ask_list)
+        
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+        self.server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        self.server_socket.bind((host, 10000 + self.worker_id))
+        self.server_socket.listen(5000)
+        
+        self.executor.submit(self.handle_client)
 
     def handle_client(self):
         while True:
             client_socket, _ = self.server_socket.accept()
-            client_thread = threading.Thread(target=self.handle_client_connection, args=(client_socket,))
-            client_thread.start()
+            self.executor(self.handle_client_connection, client_socket)
     
     def handle_client_connection(self, client_socket):
-        data = client_socket.recv(20480)
+        epoch = client_socket.recv(20480)
         # print('get msg:', data)
-        request_data = json.loads(data)
-        final_epoch = request_data['neighborhood_aggregation_async']['epochs']
-        k = request_data['neighborhood_aggregation_async']['k']
-        deltas = request_data['neighborhood_aggregation_async']['deltas']
 
-        for e in range(final_epoch):
-            self.send_snapshot_to_initial_vertex(k, deltas)
+        for e in range(epoch):
+            self.send_snapshot_to_initial_vertex(e)
 
         client_socket.shutdown(socket.SHUT_RDWR)
         client_socket.close()
+    
+    def send_snapshot_to_initial_vertex(self, epoch):
+        initial_vertex_ask_list = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for vertex in self.initial_vertex:
+                future = executor.submit(ask, vertex, f"snapshot_{epoch}")
+                initial_vertex_ask_list.append(future)
+        concurrent.futures.wait(initial_vertex_ask_list)
 
 class Vertex:
     def __init__(self, node, feature, in_edges, out_edges):
@@ -99,7 +97,7 @@ class Vertex:
         # n_f.append(inbox.pop) until '__MARKER__0'
         self.neighbor_features = [] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
         self.inbox = [] # [k, deltas, '__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
-        self.Mp = [] # [m, m, m, ...] this is part of inbox
+        # self.Mp = [] # [m, m, m, ...] this is part of inbox
         self.Recorded = [] # [all out_edges]
 
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -130,7 +128,7 @@ class Vertex:
         
     #     return self.node_feature(nid, epoch), random_neighbors
     
-    def khop_neighborhood(self, k, deltas):
+    def khop_neighborhood(self, K, DELTAS):
         # self.neighbor_features = [[] for i in range(k)]
         try:
             sums = self.get(self.epoch())
@@ -139,8 +137,8 @@ class Vertex:
             # node_neighbors_set = set(['v' + i for i in out_edges_list])
             # prefix = ""
             
-            for j in range(k): # [2,3,2]
-                random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
+            for j in range(K): # [2,3,2]
+                random_neighbors = random.sample(list(node_neighbors_set), DELTAS[j] if len(node_neighbors_set) > DELTAS[j] else len(node_neighbors_set))
                 node_neighbors_set = set()
 
                 # print(random_neighbors)
@@ -258,24 +256,32 @@ class Vertex:
                 client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
 
-    def startRecording(self):
-        self.sp_snapshot = self.get(self.epoch())
-        for out in self.out_edges_list:
+    # def startRecording(self):
+        # self.sp_snapshot = self.get(self.epoch())
+        # for out in self.out_edges_list:
+        #     send marker
+        # pass
 
-            send marker
-        pass
-
-    def record(self, sp_snaposhot, Mp):
+    def record(self, sp_snaposhot):
         pass
 
     def handle_msg(self, message):
         # request_data = json.loads(message)
         
         # try:
-        if message == "snapshot":
-            self.startRecording()
-            if len(self.Recorded) == 0:
-                self.record(self.get(self.epoch()), self.Mp)
+        if "snapshot" in message:
+            parts = message.split("_")
+            epoch = parts[1]
+            
+            self.record(self.get(self.epoch()))
+
+            for e in range(epoch):
+                initial_vertex_marker_list = []
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    for out in self.out_edges_list:
+                        future = executor.submit(ask, out, f"marker_{e}")
+                        initial_vertex_marker_list.append(future)
+                concurrent.futures.wait(initial_vertex_marker_list)
 
         elif "marker_" in message:
             pass

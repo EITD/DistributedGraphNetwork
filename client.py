@@ -63,17 +63,17 @@ def train_synchronize(epochs, k, deltas):
     return ask(request_json)
 
 def train_asynchronize(epochs, k, deltas):
-    if type(deltas) is int:
-        deltas = [deltas]
-    request_data = {
-        'neighborhood_aggregation_async': {
-            'epochs': epochs,
-            'k': k,
-            'deltas': deltas
-        }
-    }
-    request_json = json.dumps(request_data)
-    return ask(request_json)
+    # if type(deltas) is int:
+    #     deltas = [deltas]
+    # request_data = {
+    #     'neighborhood_aggregation_async': {
+    #         'epochs': epochs,
+    #         'k': k,
+    #         'deltas': deltas
+    #     }
+    # }
+    # request_json = json.dumps(request_data)
+    return ask(epochs)
 
 response = ''
 

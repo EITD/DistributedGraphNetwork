@@ -1,3 +1,4 @@
+import queue
 import random
 import socket
 import struct
@@ -105,7 +106,7 @@ class Worker:
     
     def send_snapshot_to_initial_vertex(self, epoch):
         initial_vertex_notify_list = []
-        print(self.initial_vertex)
+        # print(self.initial_vertex)
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for vertex in self.initial_vertex:
                 future = executor.submit(notify, vertex, f"snapshot_{epoch}")
@@ -130,6 +131,7 @@ class Vertex:
         self.neighbor_features = [[] for i in range(K)] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
         self.inbox = {out:[] for out in self.out_edges_list} # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
         # self.Mp = [] # [m, m, m, ...] this is part of inbox
+        self.message_queue = queue.Queue()
         
         # print(self.id)
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -147,12 +149,14 @@ class Vertex:
             exec.submit(self.handle_msg, c, self.inbox[c])
             # fList.append(future)
         # print(self.id)
+        exec.submit(self.toInbox)
         while True:
             client_socket, _ = server_socket.accept()
             try:
                 data = client_socket.recv(102400)
-                print('vertex', self.id, ':', 'get msg:', data)
-                self.toInbox(data.decode())
+                self.message_queue.put(data)
+                # print('vertex', self.id, ':', 'get msg:', data)
+                # self.toInbox(data.decode())
                 # client_socket.send(rep.encode())
                 # print('vertex', self.id, ':', 'reply msg:', rep)
             finally:
@@ -161,38 +165,41 @@ class Vertex:
                 client_socket.close()
         # concurrent.futures.wait(fList)
     
-    def toInbox(self, message):
+    def toInbox(self):
         # print(message)
-        if "snapshot_" in message:
-            parts = message.split("_")
-            epoch = parts[1]
+        while True:
+            print(self.id, self.inbox)
+            message = self.message_queue.get().decode()
+            if "snapshot_" in message:
+                parts = message.split("_")
+                epoch = parts[1]
+                
+                self.record(epoch, self.get(self.epoch()))
+
+                # pass feature and then marker
+                # for e in range(epoch):
+                initial_vertex_feature_list = []
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    for out in self.in_edges_list:
+                        future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
+                        initial_vertex_feature_list.append(future)
+                concurrent.futures.wait(initial_vertex_feature_list)
+
+                initial_vertex_marker_list = []
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    for out in self.in_edges_list:
+                        future = executor.submit(notify, out, f"marker_{epoch}_{self.id}")
+                        initial_vertex_marker_list.append(future)
+                concurrent.futures.wait(initial_vertex_marker_list)
+
+                # return 'ok'
+            elif "marker_" in message:
+                _, _, c = message.split("_")
+            else:
+                c = message.split('f')[0].split('v')[1]
+            self.inbox[c].append(message)
             
-            self.record(epoch, self.get(self.epoch()))
-
-            # pass feature and then marker
-            # for e in range(epoch):
-            initial_vertex_feature_list = []
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                for out in self.in_edges_list:
-                    future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
-                    initial_vertex_feature_list.append(future)
-            concurrent.futures.wait(initial_vertex_feature_list)
-
-            initial_vertex_marker_list = []
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                for out in self.in_edges_list:
-                    future = executor.submit(notify, out, f"marker_{epoch}_{self.id}")
-                    initial_vertex_marker_list.append(future)
-            concurrent.futures.wait(initial_vertex_marker_list)
-
-            return 'ok'
-        elif "marker_" in message:
-            _, _, c = message.split("_")
-        else:
-            c = message.split('f')[0].split('v')[1]
-        self.inbox[c].append(message)
-        
-        return 'ok'
+            # return 'ok'
     
     def epoch(self):
         return len(self.sp) - 1
@@ -267,7 +274,7 @@ class Vertex:
             try:
                 message = messageList[0]
             except IndexError:
-                sleep(3)
+                # sleep(3)
                 continue
 
             if "marker_" in message:
@@ -275,6 +282,7 @@ class Vertex:
                 epoch = parts[1]
 
                 if c in self.Enabled:
+                    
                     self.record(epoch, self.get(self.epoch()))
                     self.Enabled.remove(c)
 
@@ -344,6 +352,8 @@ def notify(node, msg, worker=False):
                 client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 10000 + int(node)))
             else:
                 client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 12345 + int(node)))
+            
+            print("connect: ", node)
             client_socket.send(msg.encode())
             
             # data = client_socket.recv(102400).decode()
@@ -354,14 +364,14 @@ def notify(node, msg, worker=False):
             client_socket.close()
             break
         except ConnectionRefusedError:
-            print('notify connection error')
+            # print('notify connection error')
             client_socket.close()
             # sleep(100)
             continue
         except OSError:
             print('notify os error')
             client_socket.close()
-            sleep(1)
+            # sleep(1)
             continue
         # except Exception as e:
         #     with open('ask', 'a') as f:

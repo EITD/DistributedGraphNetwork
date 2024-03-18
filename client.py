@@ -114,7 +114,7 @@ def train_asynchronize(epochs):
 
 # response = train_synchronize(2, 2, [100, 100])
 
-response = train_asynchronize(1)
+response = train_asynchronize(0)
 print(response)
 
 # response = train_asynchronize(2, 2, [5000, 5000**2])

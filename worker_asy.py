@@ -170,6 +170,7 @@ class Vertex:
         while True:
             print(self.id, self.inbox)
             message = self.message_queue.get().decode()
+            print('vertex', self.id, ':', 'get msg:', message)
             if "snapshot_" in message:
                 parts = message.split("_")
                 epoch = parts[1]
@@ -274,9 +275,9 @@ class Vertex:
             try:
                 message = messageList[0]
             except IndexError:
-                # sleep(3)
+                sleep(3)
                 continue
-
+            
             if "marker_" in message:
                 parts = message.split("_")
                 epoch = parts[1]
@@ -296,7 +297,7 @@ class Vertex:
                         concurrent.futures.wait(vertex_feature_list)
 
                         self.sp.append(self.khop_neighborhood())
-                        self.neighbor_features = []
+                        self.neighbor_features = [[] for i in range(K)]
 
                         vertex_marker_list = []
                         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -313,15 +314,16 @@ class Vertex:
             else:
                 if c in self.Enabled:
                     index = message.count('v')
-                    self.neighbor_features[index - 1].append(message)
+                    if index <= K:
+                        self.neighbor_features[index - 1].append(message)
 
-                    send_feature = f"v{self.id}" + message
-                    neighbor_feature_list = []
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        for out in self.in_edges_list:
-                            future = executor.submit(notify, out, send_feature)
-                            neighbor_feature_list.append(future)
-                    concurrent.futures.wait(neighbor_feature_list)
+                        send_feature = f"v{self.id}" + message
+                        neighbor_feature_list = []
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            for out in self.in_edges_list:
+                                future = executor.submit(notify, out, send_feature)
+                                neighbor_feature_list.append(future)
+                        concurrent.futures.wait(neighbor_feature_list)
 
                 else:
                     continue
@@ -353,7 +355,7 @@ def notify(node, msg, worker=False):
             else:
                 client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 12345 + int(node)))
             
-            print("connect: ", node)
+            # print("connect: ", node)
             client_socket.send(msg.encode())
             
             # data = client_socket.recv(102400).decode()
@@ -371,7 +373,7 @@ def notify(node, msg, worker=False):
         except OSError:
             print('notify os error')
             client_socket.close()
-            # sleep(1)
+            sleep(1)
             continue
         # except Exception as e:
         #     with open('ask', 'a') as f:

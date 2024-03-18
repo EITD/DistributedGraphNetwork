@@ -3,7 +3,7 @@ import random
 
 neighbor_features = [['v1f1', 'v2f2', 'v3f3'], ['v1v4f4', 'v2v4f4', 'v3v5f5'], ['v1v4v6f6', 'v2v4v6f6', 'v3v5v7f7']]
 k = 3
-deltas = [2, 1, 2]
+deltas = [2, 2, 2]
 out_edges_list = ['1','2','3']
 
 
@@ -17,13 +17,17 @@ for j in range(k): # [2,3,2]
         node_neighbors_set = set()
         
         print(random_neighbors)
+        temp = random_neighbors.copy()
+
         for feature in neighbor_features[j]:
-                if feature[0:feature.rfind('f')] in random_neighbors:
+                v = feature[feature.rfind('v'):feature.rfind('f')]
+                if v in temp:
                         sums += int(feature[feature.rfind('f') + 1:])
+                        temp.remove(v)
         
         if j < k - 1:
                 for feature in neighbor_features[j+1]:
-                        if feature[0:feature.rfind('v')] in random_neighbors:
-                                node_neighbors_set.add(feature[0:feature.rfind('f')])
+                        if 'v'+feature.split('v')[-2] in random_neighbors:
+                                node_neighbors_set.add(feature[feature.rfind('v'):feature.rfind('f')])
 
 print(sums)

@@ -160,8 +160,8 @@ class Vertex:
                 # client_socket.send(rep.encode())
                 # print('vertex', self.id, ':', 'reply msg:', rep)
             finally:
-                if system == 'Darwin':
-                    client_socket.shutdown(socket.SHUT_WR)
+                # if system == 'Darwin':
+                #     client_socket.shutdown(socket.SHUT_WR)
                 client_socket.close()
         # concurrent.futures.wait(fList)
     

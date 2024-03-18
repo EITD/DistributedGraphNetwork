@@ -124,8 +124,8 @@ def train_asynchronize_marker(epochs):
 
 
 # response = train_asynchronize_marker(1)
-# response = train_asynchronize_marker(2)
-response = train_asynchronize_marker(3)
+response = train_asynchronize_marker(2)
+# response = train_asynchronize_marker(3)
 
 # response = train_synchronize(1, 2, [20, 400])
 # response = train_synchronize(1, 3, [20, 400, 160000])

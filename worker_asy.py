@@ -14,9 +14,11 @@ import copy
 system = platform.system()
 
 NUM_PARTITIONS = 4
-K = 3
-DELTAS = [20, 400, 160000]
-NODE_FEATURES = "./data_small/node_feature_small.txt"
+K = 2
+# DELTAS = [20, 400, 160000]
+DELTAS = [5000, 5000**2]
+# NODE_FEATURES = "./data_small/node_feature_small.txt"
+NODE_FEATURES = "./data/node_features.txt"
 host = 'localhost'
 NODE_DEFAULT_FEATURE = 0
 serverDict = [host, host, host, host]
@@ -35,7 +37,8 @@ class Worker:
     def __init__(self, wid):
         self.worker_id = int(wid)
         
-        graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
+        # graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
+        graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
         
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
@@ -67,10 +70,10 @@ class Worker:
         # executor = concurrent.futures.ThreadPoolExecutor()
         # self.handle_client(server_socket)
         print('worker', self.worker_id , 'ready!')
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as e:
             while True:
-                client_socket, _ = server_socket.accept()       
-                executor.submit(self.handle_client_connection, client_socket)
+                client_socket, _ = server_socket.accept()
+                e.submit(self.handle_client_connection, client_socket)
 
     # def handle_client(self, server_socket):
     #     print("handle_client")
@@ -125,7 +128,8 @@ class Vertex:
         self.in_edges_list = in_edges
         # out_edges is Ip in chandy lamport algorithm.
         self.out_edges_list = out_edges
-        self.Enabled = copy.deepcopy(self.out_edges_list) # [all out_edges]
+        # self.Enabled = copy.deepcopy(self.out_edges_list) # [all out_edges]
+        self.Enabled = self.out_edges_list.copy() # [all out_edges]
 
         # self.epoch_dict = {}
         # n_f.append(inbox.pop) until '__MARKER__0'
@@ -142,7 +146,7 @@ class Vertex:
         server_socket.bind((host, self.port))
         server_socket.listen(5000)
 
-        print("start: ", self.id)
+        # print("start: ", self.id)
 
         exec = concurrent.futures.ThreadPoolExecutor()
         # fList = []
@@ -287,7 +291,7 @@ class Vertex:
                 # print(self.id, messageList)
                 message = messageList[0]
             except IndexError:
-                # sleep(3)
+                sleep(3)
                 continue
             
             if "marker_" in message:
@@ -321,7 +325,8 @@ class Vertex:
 
                         print(self.id, "send all markers")
 
-                        self.Enabled = copy.deepcopy(self.out_edges_list)
+                        # self.Enabled = copy.deepcopy(self.out_edges_list)
+                        self.Enabled = self.out_edges_list.copy()
                         # print(self.Enabled)
                 # messages are before marker, marker can't be in Disabled
                 else:

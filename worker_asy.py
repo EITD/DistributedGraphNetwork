@@ -3,14 +3,17 @@ import random
 import socket
 import struct
 from time import sleep
-import time
 import traceback
 from ConvertFile import ConvertFile
 import json
 import sys
 import concurrent.futures
 import platform
-import copy
+try:
+    profile
+except NameError:
+    def profile(func):
+        return func
 
 system = platform.system()
 
@@ -35,6 +38,7 @@ class Worker:
     initial_vertex = []
     target_epoch = ""
     
+    @profile
     def __init__(self, wid):
         self.worker_id = int(wid)
         
@@ -83,6 +87,7 @@ class Worker:
     #             client_socket, _ = server_socket.accept()       
     #             executor.submit(self.handle_client_connection, client_socket)
     
+    @profile
     def handle_client_connection(self, client_socket):
         data = client_socket.recv(102400)
         message = data.decode()
@@ -109,6 +114,7 @@ class Worker:
             client_socket.shutdown(socket.SHUT_WR)
         client_socket.close()
     
+    @profile
     def send_snapshot_to_initial_vertex(self, epoch):
         initial_vertex_notify_list = []
         # print(self.initial_vertex)
@@ -119,6 +125,7 @@ class Worker:
         concurrent.futures.wait(initial_vertex_notify_list)
 
 class Vertex:
+    @profile
     def __init__(self, node, feature, in_edges, out_edges):
         self.id = node
         self.port = 12345 + int(node)
@@ -172,6 +179,7 @@ class Vertex:
                 client_socket.close()
         # concurrent.futures.wait(fList)
     
+    @profile
     def toInbox(self):
         # print(message)
         while True:
@@ -224,6 +232,7 @@ class Vertex:
         except IndexError:
             return None
     
+    @profile
     def khop_neighborhood(self):
         try:
             sums = self.get(self.epoch())
@@ -287,6 +296,7 @@ class Vertex:
         #     send marker
         # pass
 
+    @profile
     def handle_msg(self, c, messageList):
         while True:
             try:
@@ -360,11 +370,12 @@ class Vertex:
                 
                 # elif cqp in self.Recorded:
                 #     pass
+    @profile
     def record(self, epoch, sp_snaposhot):
         message = f"record_{self.id}_{sp_snaposhot}_{epoch}"
         notify(str(int(self.id) % NUM_PARTITIONS), message, True)
 
-
+@profile
 def notify(node, msg, worker=False):
     print('notify:', msg)
     while True:

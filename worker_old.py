@@ -19,7 +19,8 @@ system = platform.system()
 
 NUM_PARTITIONS = 4
 # dummy file for test
-NODE_FEATURES = "./data/node_features.txt"
+# NODE_FEATURES = "./data/node_features.txt"
+NODE_FEATURES = "./data_small/node_feature_small.txt"
 # host = '130.229.152.41'
 # testIp = host
 # serverDict = {0:('130.229.166.49',12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
@@ -42,7 +43,6 @@ class Worker:
     def __init__(self, wid):
         self.worker_id = int(wid)
 
-    @profile
     def load_node_data(self):
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
@@ -52,15 +52,16 @@ class Worker:
             if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
                 self.node_data[parts[0]] = {0:int(parts[1])}
 
-    @profile
     def load_graph_dict(self):
-        self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
+        # self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
+        self.graph = ConvertFile.toGraph(f"./data_small/partition_{self.worker_id}_small.txt", " ")
         
     @profile   
     def node_feature(self, nid, epoch):
         history = self.node_data.get(nid, {})
         return history.get(epoch, NODE_DEFAULT_FEATURE)
         
+    @profile    
     def feature_and_neighborhood(self, nid, delta, epoch):
         node_neighbors_list = list()
         if nid in self.node_data.keys():
@@ -138,12 +139,14 @@ class Worker:
                 f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
         return sums
     
+    @profile
     def aggregate_neighborhood_sync(self, target_epoch, k, deltas):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for node in list(self.node_data.keys()):
                 executor.submit(self.update_node_epoch_sync, node, k, deltas)
         return {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
     
+    @profile
     def aggregate_neighborhood_async(self, target_epoch, k, deltas):
         minEpoch = min(value for key, value in self.epoch.items() if (int(key) % NUM_PARTITIONS) == self.worker_id)
         filter_nodes_1 = self.filter_nodes(minEpoch + 1)
@@ -157,10 +160,12 @@ class Worker:
                 futures.append(future)
             concurrent.futures.wait(futures)
 
+    @profile
     def filter_nodes(self, target_epoch):
         return [node for node in list(self.node_data.keys())
                 if self.epoch[node] < target_epoch and (int(node) % NUM_PARTITIONS == self.worker_id)]
     
+    @profile
     def update_node_epoch_sync(self, node, k, deltas):
         new_feature = self.khop_neighborhood(node, k, deltas)
         
@@ -183,6 +188,7 @@ class Worker:
                 if server != self.worker_id:
                     executor.submit(tell, server, request_json)
     
+    @profile
     def update_node_epoch_async(self, node, target_epoch, k, deltas, executor):
         new_feature = self.khop_neighborhood(node, k, deltas)
         
@@ -210,6 +216,7 @@ class Worker:
                 future = executor.submit(self.update_node_epoch_async, node, target_epoch, k, deltas, executor)
                 concurrent.futures.wait(future)
 
+    @profile
     def handle_msg(self, message):
         request_data = json.loads(message)
         
@@ -362,6 +369,7 @@ class Worker:
         
         return request_json
         
+@profile        
 def handle_client(client_socket, worker):
     global system
     try:
@@ -379,6 +387,7 @@ def handle_client(client_socket, worker):
             client_socket.shutdown(socket.SHUT_WR)
         client_socket.close()
 
+@profile
 def ask(node, msg):
     print('ask:', msg)
     while True:
@@ -412,7 +421,7 @@ def ask(node, msg):
         finally:
             client_socket.close()
     
-
+@profile
 def tell(server, msg):
     print('tell:', msg)
     while True:

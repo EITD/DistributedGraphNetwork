@@ -36,11 +36,11 @@ We have implemented a distributed graph store system aimed at managing graph-bas
 
 2. Neighborhood Queries: We implemented `Khop_Neighborhood(nid, k, (δ0,...,δk-1))` operations to support k-hop neighborhood queries, which calculate the aggregated features of a node's neighborhood up to k hops away.
 
-3. Message-Passing-Based Neighborhood Aggregation: To simulate the neighborhood aggregation process of GNN training, we introduced a `Train(epochs)` operation. This iterates over nodes to compute new weights based on k-hop neighborhood aggregations, with each node storing a history of aggregation weights. `Future` mechanism was considered to manage the completion of epochs and support synchronous training operations.
+3. Message-Passing-Based Neighborhood Aggregation: To simulate the neighborhood aggregation process of GNN training, we introduced a `Train(epochs)` operation. This iterates over nodes to compute new weights based on k-hop neighborhood aggregations, with each node storing a history of aggregation weights. `Future` mechanism was considered to manage the completion of epochs and support synchronous training operations. We used two protocol: RPC and Socket, each with similar logic in both asynchronous training and synchronous training.
 
-4. Marker-Based Asynchronous Training: We explored asynchronous training through iterative k-hop neighborhood aggregations, maintaining a `epoch_dict`(marker) recording each node's epoch to keep causality across aggregation steps and epochs. The marker should be disseminated across workers to signal readiness for next epoch's iteration computations.
+4. Marker-Based Asynchronous Training: We combined Chandy-Lamport algorithm with Epoch Snapshotting algorithm. We sent `snapshot` to certain initial vertex to initialize a snapshot(epoch). Each snapshot has a marker, when a vertex receives the marker, it records its state. After receiving all markers, the vertex is ready to iterative k-hop neighborhood aggregations. The marker and messages kept causality across aggregation steps and epochs through a FIFO channel, which is impletmented by TCP Socket.
 
-5. Performance Evaluation: We provided two versions of solutions based on message-passing protocol: Socket and RPC. We conducted benchmarks to evaluate and compare the performance of each solution, focusing on both the time complexity of individual lines of code within our functions and memory usage of each functions. 
+5. Performance Evaluation: For Message-Pasing-Based training, we provided and compared two versions of solutions based on Socket and RPC. To compare the message-based training approach to marker-based training method, we used the same message passing protocol: TCP Socket. The key metrics we applied include training execution time, which will provide the efficiency of each method; the number of messages, which could help understand the throughput capabilities; and the number of sockets utilized, as this might affect scalability and resource usage.
 
 ## Run
 
@@ -64,6 +64,8 @@ We also provided two test functions to verify the accuracy of train result in de
 > Use node_features_dummy.txt and change default node feature in the code.
 
 ## Evaluation
+
+Checkout to `rpc_shared_memory` branch:
 
 ### Line(Time) Analysis
 
@@ -103,8 +105,8 @@ We also provided two test functions to verify the accuracy of train result in de
 
 We extend our deepest gratitude to our team members: Yining Hou, Long Ma, Hong Jiang, who have collectively contributed to every aspect of this project.
 
-**Yining Hou**: Made significant contributions to the project, particularly in guiding the development of the RPC version and undertaking the benchmarking efforts. 
+**Yining Hou**: Made significant contributions to the project, particularly in guiding the development of the RPC version, marker-based algorithm and undertaking the benchmarking efforts. 
 
-**Long Ma**: Played a vital role in the development process, with a notable focus on the Socket version. His contributions have significantly enhanced our project's efficiency.
+**Long Ma**: Played a vital role in the development process, with a notable focus on the Socket version and marker-based algorithm. His contributions have significantly enhanced our project's efficiency.
 
-**Hong Jiang**: Involved in the project's comprehensive development, with a particular focus on testing. Her rigorous approach to testing has ensured the reliability of our solutions.
+**Hong Jiang**: Involved in the project's comprehensive development, with a particular focus on testing and marker-based algorithm. Her rigorous approach to testing has ensured the reliability of our solutions.

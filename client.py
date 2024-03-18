@@ -3,6 +3,8 @@ import time
 import socket
 import concurrent.futures
 
+from ConvertFile import ConvertFile
+
 def ask(msg, i=0, asy=False):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -37,6 +39,26 @@ def ask(msg, i=0, asy=False):
     print('duration:', end - start)
     
     return data
+
+
+# when node feature all 1(load dummmy), default is 2 ** epoch, multiple epochs, k = 1, deltas = [1]
+def test_mult_epochs(response, epoch):
+    dic = json.loads(response)['epoch_dict']
+    for key, value in dic.items():
+            if 2 ** epoch != value:
+                    print('False at:', key, 'get:', value, 'should be:', 2 ** epoch)
+
+# when node feature all 1(load dummmy), default is 1, epoch = 1, k = 1, deltas = [5000]
+all_graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
+def test_all_neighbors(response):
+    data = json.loads(response)['epoch_dict']
+    for key, value in data.items():
+        sums = 1
+        neighborsList = list(all_graph.neighbors(key))
+        sums += len(neighborsList)
+        if sums != value:
+            print("Warning:", key, 'value:', value, 'should be:', sums)
+
 
 def query_node_feature(nid):
     request_data = {
@@ -95,37 +117,28 @@ def train_asynchronize_marker(epochs):
 
 
 # response = query_node_feature(0)
-
 # response = query_node_feature(1)
-
 # response = query_khop_neighborhood(4031, 2, [5000, 5000**2])
-
 # response = query_khop_neighborhood(3, 3, [2, 18, 32])
-
 # response = query_khop_neighborhood(0, 1, 5000)
 
 
 # response = train_synchronize(1, 1, 5000)
-
 # response = train_synchronize(1, 2, [5000, 5000**2])
-
 # response = train_synchronize(2, 1, 5000)
-
 # response = train_synchronize(2, 2, [5000, 5000])
 
 
 # response = train_asynchronize(1, 1, 5000)
-
 # response = train_asynchronize(1, 2, [5000, 5000**2])
-
 # response = train_asynchronize(2, 1, 5000)
-
 # response = train_asynchronize(2, 2, [5000, 5000**2])
+response = train_asynchronize(3, 3, [20, 400, 160000])
 
 
 # response = train_asynchronize_marker(1)
 # response = train_asynchronize_marker(2)
-response = train_asynchronize_marker(3)
+# response = train_asynchronize_marker(3)
 
 # response = train_synchronize(1, 2, [20, 400])
 # response = train_synchronize(1, 3, [20, 400, 160000])

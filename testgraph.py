@@ -2,7 +2,8 @@ from ConvertFile import ConvertFile
 import networkx as nx
 
 
-graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
+# graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
+graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
 
 # out_edges = graph.successors('4031')
 # in_edges = graph.predecessors('4031')

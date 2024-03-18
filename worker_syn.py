@@ -19,7 +19,7 @@ system = platform.system()
 
 NUM_PARTITIONS = 4
 # dummy file for test
-NODE_FEATURES = "./data/node_features.txt"
+NODE_FEATURES = "./data_small/node_feature_small.txt"
 # host = '130.229.152.41'
 # testIp = host
 # serverDict = {0:('130.229.166.49',12345), 1:(testIp,12346), 2:(testIp,12347), 3:(testIp,12348)}
@@ -54,7 +54,7 @@ class Worker:
 
     @profile
     def load_graph_dict(self):
-        self.graph = ConvertFile.toGraph(f"./data/partition_{self.worker_id}.txt", " ")
+        self.graph = ConvertFile.toGraph(f"./data_small/partition_{self.worker_id}_small.txt", " ")
         
     @profile   
     def node_feature(self, nid, epoch):

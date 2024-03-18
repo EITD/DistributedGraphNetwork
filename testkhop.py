@@ -2,11 +2,11 @@
 import random
 
 def test():
-    neighbor_features = [["v2f2", "v3f3", "v4f4"], ["v2v5f5", "v3v6f6"], ["v2v5v7f7", "v2v5v8f8", "v3v6v9f9"]]
+    neighbor_features = [["v2f1", "v4f1", "v7f1", "v16f0"], ["v2v8f1", "v2v10f1", "v4v7f1", "v4v9f1", "v4v13f0", "v7v8f1", "v7v12f1"]]
     sums = 1    
-    node_neighbors_set = set(["2", "3", "4"])
-    k = 3
-    deltas = [2, 1, 2]
+    node_neighbors_set = set(["2", "4", "7", "16"])
+    k = 2
+    deltas = [20, 20]
     # prefix = ""
     for j in range(k): # [2,3,2]
         random_neighbors = random.sample(list(node_neighbors_set), deltas[j] if len(node_neighbors_set) > deltas[j] else len(node_neighbors_set))
@@ -27,7 +27,7 @@ def test():
                         print(v)
                         end_index = v.find("f")
                         sub_text = v[1:end_index] 
-                        node_neighbors_set.add(sub_text)
+                        node_neighbors_set.add(sub_text) # [2v8 7v8]
                         print(sub_text)
 
     return sums

@@ -14,8 +14,8 @@ import copy
 system = platform.system()
 
 NUM_PARTITIONS = 4
-K = 1
-DELTAS = [5000]
+K = 2
+DELTAS = [20, 20]
 NODE_FEATURES = "./data_small/node_feature_small.txt"
 host = 'localhost'
 NODE_DEFAULT_FEATURE = 0

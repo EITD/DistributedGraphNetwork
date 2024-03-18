@@ -71,18 +71,20 @@ def train_synchronize(epochs, k, deltas):
     request_json = json.dumps(request_data)
     return ask(request_json)
 
-def train_asynchronize(epochs):
-    # if type(deltas) is int:
-    #     deltas = [deltas]
-    # request_data = {
-    #     'neighborhood_aggregation_async': {
-    #         'epochs': epochs,
-    #         'k': k,
-    #         'deltas': deltas
-    #     }
-    # }
-    # request_json = json.dumps(request_data)
+def train_asynchronize(epochs, k, deltas):
+    if type(deltas) is int:
+        deltas = [deltas]
+    request_data = {
+        'neighborhood_aggregation_async': {
+            'epochs': epochs,
+            'k': k,
+            'deltas': deltas
+        }
+    }
+    request_json = json.dumps(request_data)
+    return ask(request_json)
 
+def train_asynchronize_marker(epochs):
     ask_worker_list = []
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for i in range(4):
@@ -102,30 +104,29 @@ def train_asynchronize(epochs):
 
 # response = query_khop_neighborhood(0, 1, 5000)
 
+
 # response = train_synchronize(1, 1, 5000)
-
-# response = train_asynchronize(1, 1, 5000)
-
-# response = train_synchronize(2, 1, 5000)
-
-# response = train_asynchronize(2, 1, 5000)
-
-# response = train_asynchronize(2, 10, [1,2,3,4,5,6,7,8,9,10])
-
-# response = train_synchronize(2, 2, [100, 100])
-
-response = train_asynchronize(1)
-print(response)
-
-# response = train_asynchronize(2, 2, [5000, 5000**2])
-
-# response = train_asynchronize(2, 2, [100, 100])
 
 # response = train_synchronize(1, 2, [5000, 5000**2])
 
+# response = train_synchronize(2, 1, 5000)
+
+# response = train_synchronize(2, 2, [5000, 5000])
+
+
+# response = train_asynchronize(1, 1, 5000)
+
 # response = train_asynchronize(1, 2, [5000, 5000**2])
 
-# response = train_asynchronize(5, 2, [2,3])
+# response = train_asynchronize(2, 1, 5000)
 
-# with open('check', 'a') as f: 
-#     f.write('\n\n\n\n' + str(json.loads(response)['epoch_dict'])) 
+# response = train_asynchronize(2, 2, [5000, 5000**2])
+
+
+response = train_asynchronize_marker(1)
+# response = train_asynchronize_marker(2)
+# response = train_asynchronize_marker(3)
+
+# response = train_synchronize(1, 2, [20, 20])
+# response = train_synchronize(2, 1, 20)
+# response = train_synchronize(3, 1, 20)

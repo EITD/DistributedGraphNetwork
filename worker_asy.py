@@ -9,6 +9,7 @@ import json
 import sys
 import concurrent.futures
 import platform
+import copy
 
 system = platform.system()
 
@@ -124,7 +125,7 @@ class Vertex:
         self.in_edges_list = in_edges
         # out_edges is Ip in chandy lamport algorithm.
         self.out_edges_list = out_edges
-        self.Enabled = self.out_edges_list # [all out_edges]
+        self.Enabled = copy.deepcopy(self.out_edges_list) # [all out_edges]
 
         # self.epoch_dict = {}
         # n_f.append(inbox.pop) until '__MARKER__0'
@@ -186,12 +187,17 @@ class Vertex:
                         initial_vertex_feature_list.append(future)
                 concurrent.futures.wait(initial_vertex_feature_list)
 
+                print(self.id, "send all features")
+
                 initial_vertex_marker_list = []
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     for out in self.in_edges_list:
                         future = executor.submit(notify, out, f"marker_{epoch}_{self.id}")
                         initial_vertex_marker_list.append(future)
                 concurrent.futures.wait(initial_vertex_marker_list)
+
+                print(self.id, "send all markers")
+                continue
 
                 # return 'ok'
             elif "marker_" in message:
@@ -200,6 +206,7 @@ class Vertex:
                 c = message.split('f')[0].split('v')[1]
             self.inbox[c].append(message)
             
+            # print(self.id, self.message_queue.empty)
             # return 'ok'
     
     def epoch(self):
@@ -273,6 +280,7 @@ class Vertex:
     def handle_msg(self, c, messageList):
         while True:
             try:
+                # print(self.id, messageList)
                 message = messageList[0]
             except IndexError:
                 sleep(3)
@@ -283,7 +291,6 @@ class Vertex:
                 epoch = parts[1]
 
                 if c in self.Enabled:
-                    
                     self.record(epoch, self.get(self.epoch()))
                     self.Enabled.remove(c)
 
@@ -296,6 +303,8 @@ class Vertex:
                                 vertex_feature_list.append(future)
                         concurrent.futures.wait(vertex_feature_list)
 
+                        print(self.id, "send all features")
+
                         self.sp.append(self.khop_neighborhood())
                         self.neighbor_features = [[] for i in range(K)]
 
@@ -306,7 +315,10 @@ class Vertex:
                                 vertex_marker_list.append(future)
                         concurrent.futures.wait(vertex_marker_list)
 
-                        self.Enabled = self.out_edges_list
+                        print(self.id, "send all markers")
+
+                        self.Enabled = copy.deepcopy(self.out_edges_list)
+                        # print(self.Enabled)
                 # messages are before marker, marker can't be in Disabled
                 else:
                     continue

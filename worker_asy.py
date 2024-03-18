@@ -3,6 +3,7 @@ import random
 import socket
 import struct
 from time import sleep
+import time
 import traceback
 from ConvertFile import ConvertFile
 import json
@@ -17,8 +18,8 @@ NUM_PARTITIONS = 4
 K = 2
 # DELTAS = [20, 400, 160000]
 DELTAS = [5000, 5000**2]
-# NODE_FEATURES = "./data_small/node_feature_small.txt"
-NODE_FEATURES = "./data/node_features.txt"
+NODE_FEATURES = "./data_small/node_feature_small.txt"
+# NODE_FEATURES = "./data/node_features.txt"
 host = 'localhost'
 NODE_DEFAULT_FEATURE = 0
 serverDict = [host, host, host, host]
@@ -37,8 +38,8 @@ class Worker:
     def __init__(self, wid):
         self.worker_id = int(wid)
         
-        # graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
-        graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
+        graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
+        # graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
         
         with open(NODE_FEATURES, 'r') as file:
             lines = file.readlines()
@@ -159,6 +160,7 @@ class Vertex:
             client_socket, _ = server_socket.accept()
             try:
                 data = client_socket.recv(102400)
+                # print(time.time())
                 self.message_queue.put(data)
                 # print('vertex', self.id, ':', 'get msg:', data)
                 # self.toInbox(data.decode())
@@ -377,6 +379,7 @@ def notify(node, msg, worker=False):
                 client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 12345 + int(node)))
             
             # print("connect: ", node)
+            # print(time.time())
             client_socket.send(msg.encode())
             
             # data = client_socket.recv(102400).decode()

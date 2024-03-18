@@ -169,7 +169,7 @@ class Vertex:
     def toInbox(self):
         # print(message)
         while True:
-            print(self.id, self.inbox)
+            # print(self.id, self.inbox)
             message = self.message_queue.get().decode()
             print('vertex', self.id, ':', 'get msg:', message)
             if "snapshot_" in message:
@@ -287,7 +287,7 @@ class Vertex:
                 # print(self.id, messageList)
                 message = messageList[0]
             except IndexError:
-                sleep(3)
+                # sleep(3)
                 continue
             
             if "marker_" in message:
@@ -332,7 +332,7 @@ class Vertex:
                     index = message.count('v')
                     if index <= K:
                         self.neighbor_features[index - 1].append(message)
-
+                    if index < K:
                         send_feature = f"v{self.id}" + message
                         neighbor_feature_list = []
                         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -384,12 +384,12 @@ def notify(node, msg, worker=False):
         except ConnectionRefusedError:
             # print('notify connection error')
             client_socket.close()
-            # sleep(100)
+            # sleep(1)
             continue
         except OSError:
             print('notify os error')
             client_socket.close()
-            sleep(1)
+            # sleep(1)
             continue
         # except Exception as e:
         #     with open('ask', 'a') as f:

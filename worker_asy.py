@@ -14,8 +14,8 @@ import copy
 system = platform.system()
 
 NUM_PARTITIONS = 4
-K = 2
-DELTAS = [20, 20]
+K = 3
+DELTAS = [20, 400, 160000]
 NODE_FEATURES = "./data_small/node_feature_small.txt"
 host = 'localhost'
 NODE_DEFAULT_FEATURE = 0
@@ -228,6 +228,7 @@ class Vertex:
             for j in range(K): 
                 random_neighbors = random.sample(list(node_neighbors_set), DELTAS[j] if len(node_neighbors_set) > DELTAS[j] else len(node_neighbors_set))
                 node_neighbors_set = set()
+                temp_set = set()
 
                 # print(random_neighbors)
                 # for feature in self.neighbor_features[j]:
@@ -249,8 +250,11 @@ class Vertex:
                             if v.startswith("v" + vertex):
                                 # start_index = len("v" + vertex)
                                 end_index = v.find("f")
-                                sub_text = v[1:end_index] 
-                                node_neighbors_set.add(sub_text)
+                                sub_text = v[1:end_index]
+                                temp = v[v.rfind("v") + 1 : end_index]
+                                if temp not in temp_set:
+                                    node_neighbors_set.add(sub_text) # [2v8 7v8]
+                                    temp_set.add(temp)
                 
                 # featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
                 

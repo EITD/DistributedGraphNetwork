@@ -2,6 +2,7 @@ import queue
 import random
 import socket
 import struct
+import threading
 from time import sleep
 import traceback
 from ConvertFile import ConvertFile
@@ -107,7 +108,7 @@ class Vertex:
         self.id = node
         self.port = 12345 + int(node)
         self.sp = [feature] 
-        # self.sp_snapshot = None # sp*
+        self.sp_snapshot = None # sp*
 
         # in_edges is Op in chandy lamport algorithm.
         self.in_edges_list = in_edges
@@ -119,6 +120,11 @@ class Vertex:
         self.inbox = {out:[] for out in self.out_edges_list} # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
         # self.Mp = [] # [m, m, m, ...] this is part of inbox
         self.message_queue = queue.Queue()
+
+        self.khop = threading.Condition()
+        self.lock = threading.Condition()
+        self.khop_started = False
+        # self.record_state = threading.Condition()
         
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -197,8 +203,20 @@ class Vertex:
     def khop_neighborhood(self):
         try:
             sums = self.get(self.epoch())
-            
+            # print(self.id, sums)
             node_neighbors_set = set(self.out_edges_list)
+
+            random_neighbors = random.sample(list(node_neighbors_set), DELTAS[0] if len(node_neighbors_set) > DELTAS[0] else len(node_neighbors_set))
+            node_neighbors_set = random_neighbors.copy()
+            while True:
+                if all(any(feature.startswith("v" + vertex) for feature in self.neighbor_features[0]) for vertex in random_neighbors): 
+                    break
+                else:
+                    # print(self.id, vertex, self.neighbor_features[0])
+                    # with self.record_state:
+                    #     self.record_state.notify()
+                    with self.khop:
+                        self.khop.wait()    
             
             for j in range(K): 
                 random_neighbors = random.sample(list(node_neighbors_set), DELTAS[j] if len(node_neighbors_set) > DELTAS[j] else len(node_neighbors_set))
@@ -220,6 +238,7 @@ class Vertex:
                             start_index = feature.find("f")
                             sub_text = feature[start_index + 1:] 
                             sums += int(sub_text)
+                            # print(self.id, vertex, sums)
                     if j < K - 1:
                         for v in self.neighbor_features[j + 1]:
                             if v.startswith("v" + vertex):
@@ -244,10 +263,17 @@ class Vertex:
                 #     data = json.loads(msg)
                 #     if j < k - 1:
                 #         node_neighbors_set.update(data['out_edges'])
+            
         except Exception as e:
             with open('khop_neighborhood', 'a') as f:
                 f.write(str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
-        return sums
+
+        self.neighbor_features = [[] for i in range(K)]
+        self.sp.append(sums)
+        # with self.record_state:
+        #     self.record_state.notify()
+        # print("khop result: ", self.id, sums)
+        # return sums
     
     # def startRecording(self):
         # self.sp_snapshot = self.get(self.epoch())
@@ -269,23 +295,46 @@ class Vertex:
                 epoch = parts[1]
 
                 if c in self.Enabled:
-                    # self.record(self.epoch, self.get(self.epoch()))
-                    self.Enabled.remove(c)
+                    with self.lock:
+                        # first time receive marker from one edge
+                        if not self.khop_started:
+                            self.sp_snapshot = self.get(self.epoch())
+                            threading.Thread(target=self.khop_neighborhood).start()
+                            self.khop_started = True
+                        # receive markers from other edges
+                        else:
+                            with self.khop:
+                                self.khop.notify()
+                        #  wait for khop finish
+                        if len(self.Enabled) == 1: 
+                            while self.epoch() != int(epoch):
+                                print("here")
+                                sleep(1)
+                            self.khop_started = False
+                        # if len(self.Enabled) == 1 and t.is_alive():
+                        #     print("here1")
+                        #     t.join()
+                                
+                        # with self.record_state:
+                        #     self.record_state.wait()
+                        self.record(self.epoch(), self.get(self.epoch()))
+
+                        self.Enabled.remove(c)
 
                     if len(self.Enabled) == 0:
                         # send self feature
                         vertex_feature_list = []
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             for out in self.in_edges_list:
-                                future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
+                                future = executor.submit(notify, out, f"v{self.id}f{self.sp_snapshot}")
                                 vertex_feature_list.append(future)
                         concurrent.futures.wait(vertex_feature_list)
 
                         print(self.id, "send all features")
 
-                        self.sp.append(self.khop_neighborhood())
-                        self.neighbor_features = [[] for i in range(K)]
-                        self.record(epoch, self.get(self.epoch()))
+                        # self.sp.append(self.khop_neighborhood())
+                        # self.neighbor_features = [[] for i in range(K)]
+                        # self.record(epoch, self.get(self.epoch()))
 
                         # send self marker
                         vertex_marker_list = []

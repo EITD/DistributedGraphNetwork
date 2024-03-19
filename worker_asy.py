@@ -1,22 +1,15 @@
-from datetime import datetime
 import queue
 import random
 import socket
 import struct
-import threading
 from time import sleep
 import traceback
-import psutil
 from ConvertFile import ConvertFile
 import json
 import sys
 import concurrent.futures
 import platform
-try:
-    profile
-except NameError:
-    def profile(func):
-        return func
+import copy
 
 system = platform.system()
 
@@ -30,6 +23,10 @@ host = 'localhost'
 NODE_DEFAULT_FEATURE = 0
 serverDict = [host, host, host, host]
 
+# class Marker:
+#     def __init__(self):
+#         pass
+
 class Worker:
     worker_id = None
     vertexDict = {}
@@ -37,7 +34,6 @@ class Worker:
     initial_vertex = []
     target_epoch = ""
     
-    @profile
     def __init__(self, wid):
         self.worker_id = int(wid)
         
@@ -53,6 +49,7 @@ class Worker:
                 self.vertex_number += 1
                 out_edges = graph.successors(parts[0])
                 in_edges = graph.predecessors(parts[0])
+                # self.vertexDict[12345 + int(parts[0])] = Vertex(parts[0], int(parts[1]), in_edges, out_edges)
                 executor.submit(Vertex, parts[0], int(parts[1]), list(in_edges), list(out_edges))
         
         sources = [n for n, d in graph.out_degree() if d == 0]
@@ -70,20 +67,28 @@ class Worker:
         server_socket.bind((host, 10000 + self.worker_id))
         server_socket.listen(1500)
         
+        # executor = concurrent.futures.ThreadPoolExecutor()
+        # self.handle_client(server_socket)
         print('worker', self.worker_id , 'ready!')
         with concurrent.futures.ThreadPoolExecutor() as e:
             while True:
                 client_socket, _ = server_socket.accept()
                 e.submit(self.handle_client_connection, client_socket)
+
+    # def handle_client(self, server_socket):
+    #     print("handle_client")
+    #     with concurrent.futures.ThreadPoolExecutor() as executor:
+    #         while True:
+    #             client_socket, _ = server_socket.accept()       
+    #             executor.submit(self.handle_client_connection, client_socket)
     
-    @profile
     def handle_client_connection(self, client_socket):
         data = client_socket.recv(102400)
         message = data.decode()
         print('worker', self.worker_id, ':', 'get msg:', data)
         if "epoch_" in message:
             self.target_epoch = message.split("_")[1]
-            for e in range(1, int(self.target_epoch) + 1):
+            for e in range(int(self.target_epoch) + 1):
                 self.send_snapshot_to_initial_vertex(e)
             while True:
                 if len(self.vertexDict.keys()) == self.vertex_number:
@@ -103,7 +108,6 @@ class Worker:
             client_socket.shutdown(socket.SHUT_WR)
         client_socket.close()
     
-    @profile
     def send_snapshot_to_initial_vertex(self, epoch):
         initial_vertex_notify_list = []
         # print(self.initial_vertex)
@@ -114,29 +118,27 @@ class Worker:
         concurrent.futures.wait(initial_vertex_notify_list)
 
 class Vertex:
-    @profile
     def __init__(self, node, feature, in_edges, out_edges):
         self.id = node
         self.port = 12345 + int(node)
         self.sp = [feature] 
-        self.sp_snapshot = None # sp*
+        # self.sp_snapshot = None # sp*
 
         # in_edges is Op in chandy lamport algorithm.
         self.in_edges_list = in_edges
         # out_edges is Ip in chandy lamport algorithm.
         self.out_edges_list = out_edges
+        # self.Enabled = copy.deepcopy(self.out_edges_list) # [all out_edges]
         self.Enabled = self.out_edges_list.copy() # [all out_edges]
 
+        # self.epoch_dict = {}
+        # n_f.append(inbox.pop) until '__MARKER__0'
         self.neighbor_features = [[] for i in range(K)] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
         self.inbox = {out:[] for out in self.out_edges_list} # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
         # self.Mp = [] # [m, m, m, ...] this is part of inbox
         self.message_queue = queue.Queue()
-
-        self.khop = threading.Condition()
-        self.lock = threading.Condition()
-        self.khop_started = False
-        # self.record_state = threading.Condition()
         
+        # print(self.id)
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
@@ -147,24 +149,27 @@ class Vertex:
         # print("start: ", self.id)
 
         exec = concurrent.futures.ThreadPoolExecutor()
-        # listen channels
+        # fList = []
         for c in self.out_edges_list:
             exec.submit(self.handle_msg, c, self.inbox[c])
-        # classify message to specific channel
+            # fList.append(future)
+        # print(self.id)
         exec.submit(self.toInbox)
-
         while True:
             client_socket, _ = server_socket.accept()
             try:
                 data = client_socket.recv(102400)
                 self.message_queue.put(data)
                 # print('vertex', self.id, ':', 'get msg:', data)
+                # self.toInbox(data.decode())
+                # client_socket.send(rep.encode())
+                # print('vertex', self.id, ':', 'reply msg:', rep)
             finally:
                 # if system == 'Darwin':
                 #     client_socket.shutdown(socket.SHUT_WR)
                 client_socket.close()
+        # concurrent.futures.wait(fList)
     
-    @profile
     def toInbox(self):
         # print(message)
         while True:
@@ -178,6 +183,7 @@ class Vertex:
                 self.record(epoch, self.get(self.epoch()))
 
                 # pass feature and then marker
+                # for e in range(epoch):
                 initial_vertex_feature_list = []
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     for out in self.in_edges_list:
@@ -197,12 +203,16 @@ class Vertex:
                 print(self.id, "send all markers")
                 continue
 
+                # return 'ok'
             elif "marker_" in message:
                 _, _, c = message.split("_")
             else:
                 c = message.split('f')[0].split('v')[1]
             self.inbox[c].append(message)
-                
+            
+            # print(self.id, self.message_queue.empty)
+            # return 'ok'
+    
     def epoch(self):
         return len(self.sp) - 1
     
@@ -212,24 +222,12 @@ class Vertex:
         except IndexError:
             return None
     
-    @profile
     def khop_neighborhood(self):
         try:
             sums = self.get(self.epoch())
-            # print(self.id, sums)
+            
             node_neighbors_set = set(self.out_edges_list)
-
-            random_neighbors = random.sample(list(node_neighbors_set), DELTAS[0] if len(node_neighbors_set) > DELTAS[0] else len(node_neighbors_set))
-            node_neighbors_set = random_neighbors.copy()
-            while True:
-                if all(any(feature.startswith("v" + vertex) for feature in self.neighbor_features[0]) for vertex in random_neighbors): 
-                    break
-                else:
-                    # print(self.id, vertex, self.neighbor_features[0])
-                    # with self.record_state:
-                    #     self.record_state.notify()
-                    with self.khop:
-                        self.khop.wait()    
+            # node_neighbors_set = set(['v' + i for i in out_edges_list])
             
             for j in range(K): 
                 random_neighbors = random.sample(list(node_neighbors_set), DELTAS[j] if len(node_neighbors_set) > DELTAS[j] else len(node_neighbors_set))
@@ -251,10 +249,10 @@ class Vertex:
                             start_index = feature.find("f")
                             sub_text = feature[start_index + 1:] 
                             sums += int(sub_text)
-                            # print(self.id, vertex, sums)
                     if j < K - 1:
                         for v in self.neighbor_features[j + 1]:
                             if v.startswith("v" + vertex):
+                                # start_index = len("v" + vertex)
                                 end_index = v.find("f")
                                 sub_text = v[1:end_index]
                                 temp = v[v.rfind("v") + 1 : end_index]
@@ -276,17 +274,10 @@ class Vertex:
                 #     data = json.loads(msg)
                 #     if j < k - 1:
                 #         node_neighbors_set.update(data['out_edges'])
-            
         except Exception as e:
             with open('khop_neighborhood', 'a') as f:
                 f.write(str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
-
-        self.neighbor_features = [[] for i in range(K)]
-        self.sp.append(sums)
-        # with self.record_state:
-        #     self.record_state.notify()
-        # print("khop result: ", self.id, sums)
-        # return sums
+        return sums
     
     # def startRecording(self):
         # self.sp_snapshot = self.get(self.epoch())
@@ -294,7 +285,6 @@ class Vertex:
         #     send marker
         # pass
 
-    @profile
     def handle_msg(self, c, messageList):
         while True:
             try:
@@ -309,47 +299,23 @@ class Vertex:
                 epoch = parts[1]
 
                 if c in self.Enabled:
-                    with self.lock:
-                        # first time receive marker from one edge
-                        if not self.khop_started:
-                            self.sp_snapshot = self.get(self.epoch())
-                            threading.Thread(target=self.khop_neighborhood).start()
-                            self.khop_started = True
-                        # receive markers from other edges
-                        else:
-                            with self.khop:
-                                self.khop.notify()
-                        #  wait for khop finish
-                        if len(self.Enabled) == 1: 
-                            while self.epoch() != int(epoch):
-                                sleep(1)
-                            self.khop_started = False
-                        # if len(self.Enabled) == 1 and t.is_alive():
-                        #     print("here1")
-                        #     t.join()
-                                
-                        # with self.record_state:
-                        #     self.record_state.wait()
-                        self.record(self.epoch(), self.get(self.epoch()))
-
-                        self.Enabled.remove(c)
+                    self.record(epoch, self.get(self.epoch()))
+                    self.Enabled.remove(c)
 
                     if len(self.Enabled) == 0:
                         # send self feature
                         vertex_feature_list = []
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             for out in self.in_edges_list:
-                                future = executor.submit(notify, out, f"v{self.id}f{self.sp_snapshot}")
+                                future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
                                 vertex_feature_list.append(future)
                         concurrent.futures.wait(vertex_feature_list)
 
                         print(self.id, "send all features")
 
-                        # self.sp.append(self.khop_neighborhood())
-                        # self.neighbor_features = [[] for i in range(K)]
-                        # self.record(epoch, self.get(self.epoch()))
+                        self.sp.append(self.khop_neighborhood())
+                        self.neighbor_features = [[] for i in range(K)]
 
-                        # send self marker
                         vertex_marker_list = []
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             for out in self.in_edges_list:
@@ -359,7 +325,9 @@ class Vertex:
 
                         print(self.id, "send all markers")
 
+                        # self.Enabled = copy.deepcopy(self.out_edges_list)
                         self.Enabled = self.out_edges_list.copy()
+                        # print(self.Enabled)
                 # messages are before marker, marker can't be in Disabled
                 else:
                     continue
@@ -383,17 +351,18 @@ class Vertex:
             
             messageList.pop(0)
 
+            # return 'ok'
+
                 # if cqp not in self.Recorded:
                 #     pass
                 
                 # elif cqp in self.Recorded:
                 #     pass
-    @profile
     def record(self, epoch, sp_snaposhot):
         message = f"record_{self.id}_{sp_snaposhot}_{epoch}"
         notify(str(int(self.id) % NUM_PARTITIONS), message, True)
 
-@profile
+
 def notify(node, msg, worker=False):
     print('notify:', msg)
     while True:
@@ -411,13 +380,14 @@ def notify(node, msg, worker=False):
             client_socket.send(msg.encode())
             
             # data = client_socket.recv(102400).decode()
+            
             # print('get reply:', data)
 
             client_socket.shutdown(socket.SHUT_WR)
             client_socket.close()
             break
         except ConnectionRefusedError:
-            print('notify connection error')
+            # print('notify connection error')
             client_socket.close()
             # sleep(1)
             continue
@@ -432,14 +402,5 @@ def notify(node, msg, worker=False):
         finally:
             client_socket.close()
 
-def memory():
-    while True:
-        memory_info = psutil.virtual_memory()
-        current_time = datetime.now().time()
-        with open('memory_marker', 'a') as f: 
-            f.write('\n' + f"{current_time} {memory_info.percent}")
-        sleep(1)
-
 if __name__ == "__main__":
-    # threading.Thread(target=memory).start()
     worker = Worker(sys.argv[1])

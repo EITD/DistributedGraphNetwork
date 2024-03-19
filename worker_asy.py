@@ -75,13 +75,6 @@ class Worker:
             while True:
                 client_socket, _ = server_socket.accept()
                 e.submit(self.handle_client_connection, client_socket)
-
-    # def handle_client(self, server_socket):
-    #     print("handle_client")
-    #     with concurrent.futures.ThreadPoolExecutor() as executor:
-    #         while True:
-    #             client_socket, _ = server_socket.accept()       
-    #             executor.submit(self.handle_client_connection, client_socket)
     
     @profile
     def handle_client_connection(self, client_socket):

@@ -4,7 +4,7 @@ import random
 import socket
 import struct
 import threading
-import time
+from time import sleep
 import traceback
 import psutil
 from ConvertFile import ConvertFile
@@ -301,7 +301,7 @@ class Vertex:
                 # print(self.id, messageList)
                 message = messageList[0]
             except IndexError:
-                time.sleep(3)
+                sleep(3)
                 continue
             
             if "marker_" in message:
@@ -322,7 +322,7 @@ class Vertex:
                         #  wait for khop finish
                         if len(self.Enabled) == 1: 
                             while self.epoch() != int(epoch):
-                                time.sleep(1)
+                                sleep(1)
                             self.khop_started = False
                         # if len(self.Enabled) == 1 and t.is_alive():
                         #     print("here1")
@@ -438,7 +438,7 @@ def memory():
         current_time = datetime.now().time()
         with open('memory_marker', 'a') as f: 
             f.write('\n' + f"{current_time} {memory_info.percent}")
-        time.sleep(1)
+        sleep(1)
 
 if __name__ == "__main__":
     # threading.Thread(target=memory).start()

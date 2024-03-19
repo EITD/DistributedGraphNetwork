@@ -4,7 +4,7 @@ import socket
 import struct
 import threading
 import traceback
-import time
+from time import sleep
 import psutil
 from ConvertFile import ConvertFile
 import json
@@ -352,7 +352,7 @@ class Worker:
                         self.aggregate_neighborhood_async(target_epoch, k, deltas)
                         self.updateFlag = False
                     else:
-                        time.sleep(0.5)
+                        sleep(0.5)
                 request_data = {
                     'graph_weight_async' : {nodeKey:value for nodeKey, nodeEpochDict in self.node_data.items() for key, value in nodeEpochDict.items() if key == target_epoch}
                 }
@@ -446,7 +446,7 @@ def tell(server, msg):
         except OSError as e:
             print('tell os error')
             client_socket.close()
-            time.sleep(1)
+            sleep(1)
             continue
         # except Exception as e:
         #     with open('tell', 'a') as f:
@@ -475,7 +475,7 @@ def memory():
         current_time = datetime.now().time()
         with open('memory_message_asy', 'a') as f: 
             f.write('\n' + f"{current_time} {memory_info.percent}")
-        time.sleep(0.1)
+        sleep(0.1)
 
 if __name__ == "__main__":
     # threading.Thread(target=memory).start()

@@ -1,3 +1,4 @@
+from datetime import datetime
 import queue
 import random
 import socket
@@ -5,11 +6,17 @@ import struct
 import threading
 from time import sleep
 import traceback
+import psutil
 from ConvertFile import ConvertFile
 import json
 import sys
 import concurrent.futures
 import platform
+try:
+    profile
+except NameError:
+    def profile(func):
+        return func
 
 system = platform.system()
 
@@ -30,6 +37,7 @@ class Worker:
     initial_vertex = []
     target_epoch = ""
     
+    @profile
     def __init__(self, wid):
         self.worker_id = int(wid)
         
@@ -68,6 +76,7 @@ class Worker:
                 client_socket, _ = server_socket.accept()
                 e.submit(self.handle_client_connection, client_socket)
     
+    @profile
     def handle_client_connection(self, client_socket):
         data = client_socket.recv(102400)
         message = data.decode()
@@ -94,6 +103,7 @@ class Worker:
             client_socket.shutdown(socket.SHUT_WR)
         client_socket.close()
     
+    @profile
     def send_snapshot_to_initial_vertex(self, epoch):
         initial_vertex_notify_list = []
         # print(self.initial_vertex)
@@ -104,6 +114,7 @@ class Worker:
         concurrent.futures.wait(initial_vertex_notify_list)
 
 class Vertex:
+    @profile
     def __init__(self, node, feature, in_edges, out_edges):
         self.id = node
         self.port = 12345 + int(node)
@@ -153,6 +164,7 @@ class Vertex:
                 #     client_socket.shutdown(socket.SHUT_WR)
                 client_socket.close()
     
+    @profile
     def toInbox(self):
         # print(message)
         while True:
@@ -200,6 +212,7 @@ class Vertex:
         except IndexError:
             return None
     
+    @profile
     def khop_neighborhood(self):
         try:
             sums = self.get(self.epoch())
@@ -281,6 +294,7 @@ class Vertex:
         #     send marker
         # pass
 
+    @profile
     def handle_msg(self, c, messageList):
         while True:
             try:
@@ -308,7 +322,6 @@ class Vertex:
                         #  wait for khop finish
                         if len(self.Enabled) == 1: 
                             while self.epoch() != int(epoch):
-                                print("here")
                                 sleep(1)
                             self.khop_started = False
                         # if len(self.Enabled) == 1 and t.is_alive():
@@ -370,17 +383,17 @@ class Vertex:
             
             messageList.pop(0)
 
-            # if cqp not in self.Recorded:
-            #     pass
-            
-            # elif cqp in self.Recorded:
-            #     pass
-            
+                # if cqp not in self.Recorded:
+                #     pass
+                
+                # elif cqp in self.Recorded:
+                #     pass
+    @profile
     def record(self, epoch, sp_snaposhot):
         message = f"record_{self.id}_{sp_snaposhot}_{epoch}"
         notify(str(int(self.id) % NUM_PARTITIONS), message, True)
 
-
+@profile
 def notify(node, msg, worker=False):
     print('notify:', msg)
     while True:
@@ -419,5 +432,14 @@ def notify(node, msg, worker=False):
         finally:
             client_socket.close()
 
+def memory():
+    while True:
+        memory_info = psutil.virtual_memory()
+        current_time = datetime.now().time()
+        with open('memory_marker', 'a') as f: 
+            f.write('\n' + f"{current_time} {memory_info.percent}")
+        sleep(1)
+
 if __name__ == "__main__":
+    # threading.Thread(target=memory).start()
     worker = Worker(sys.argv[1])

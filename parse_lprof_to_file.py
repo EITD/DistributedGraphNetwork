@@ -8,7 +8,8 @@ def profile_lprof_to_file(profile_file, output_file):
         f.write(result.stdout)
 
 if __name__ == "__main__":
-    profile_file = 'worker.py.lprof'  
+    # profile_file = 'worker_old.py.lprof'
+    profile_file = 'worker_asy.py.lprof'   
     output_file = "profile_results" + sys.argv[1] + ".txt"
 
     profile_lprof_to_file(profile_file, output_file)

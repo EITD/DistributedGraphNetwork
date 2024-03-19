@@ -1,12 +1,18 @@
+import json
 import socket
 import struct
 import threading
 import time
 
-# client send time:  1710799351.11728
-# server receive time:  1710799351.11736
-# server send back msg:  hi 1710799351.117373
-# client get msg: hi 1710799351.117407
+# client send time:  1710873745.381695
+# server receive time:  1710873745.3817751
+# server send back msg:  json.dumps(msg) 1710873745.381788
+# client get msg: json.dumps(msg) 1710873745.3818161
+
+# client send time:  1710873555.200555
+# server receive time:  1710873555.200626
+# server send back msg:  {"test1": "test1", "test2": "test2", "test3": "test3"} 1710873555.200636
+# client get msg: {"test1": "test1", "test2": "test2", "test3": "test3"} 1710873555.2006662
 
 def send(msg):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -56,5 +62,10 @@ def receive():
 
 if __name__ == "__main__":
     threading.Thread(target=receive).start()
-    threading.Thread(target=send, args=("hi", )).start()
+    # msg = {
+    #     "test1": "test1",
+    #     "test2": "test2",
+    #     "test3": "test3"
+    # }
+    threading.Thread(target=send, args=("json.dumps(msg)", )).start()
 

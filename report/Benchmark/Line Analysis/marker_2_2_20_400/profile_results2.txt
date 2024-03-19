@@ -1,418 +1,443 @@
 Timer unit: 1e-06 s
 
-Total time: 537.972 s
+Total time: 103.579 s
 File: worker_asy.py
-Function: __init__ at line 41
+Function: __init__ at line 38
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-    41                                               @profile
-    42                                               def __init__(self, wid):
-    43         1          2.0      2.0      0.0          self.worker_id = int(wid)
+    38                                               @profile
+    39                                               def __init__(self, wid):
+    40         1          1.0      1.0      0.0          self.worker_id = int(wid)
+    41                                                   
+    42         1        731.0    731.0      0.0          graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
+    43                                                   # graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
     44                                                   
-    45         1        722.0    722.0      0.0          graph = ConvertFile.toGraph(f"./data_small/neighbor_small.txt", " ")
-    46                                                   # graph = ConvertFile.toGraph(f"./data/neighbor.txt", " ")
-    47                                                   
-    48         2         30.0     15.0      0.0          with open(NODE_FEATURES, 'r') as file:
-    49         1         10.0     10.0      0.0              lines = file.readlines()
-    50         1        423.0    423.0      0.0          executor = concurrent.futures.ThreadPoolExecutor(max_workers=1500)
-    51        14          4.0      0.3      0.0          for line in lines:
-    52        13         14.0      1.1      0.0              parts = line.strip().split()[:2]
-    53        13          7.0      0.5      0.0              if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
-    54         3          3.0      1.0      0.0                  self.vertex_number += 1
-    55         3          6.0      2.0      0.0                  out_edges = graph.successors(parts[0])
-    56         3          2.0      0.7      0.0                  in_edges = graph.predecessors(parts[0])
-    57                                                           # self.vertexDict[12345 + int(parts[0])] = Vertex(parts[0], int(parts[1]), in_edges, out_edges)
-    58         3        554.0    184.7      0.0                  executor.submit(Vertex, parts[0], int(parts[1]), list(in_edges), list(out_edges))
-    59                                                   
-    60         1         30.0     30.0      0.0          sources = [n for n, d in graph.out_degree() if d == 0]
-    61         8          1.0      0.1      0.0          for vertex in sources:
-    62         7          6.0      0.9      0.0              if int(vertex) % NUM_PARTITIONS == self.worker_id:
-    63         2          1.0      0.5      0.0                  self.vertex_number += 1
-    64         2          1.0      0.5      0.0                  self.initial_vertex.append(vertex)
-    65         2          3.0      1.5      0.0                  in_edges = graph.predecessors(vertex)
-    66         2        330.0    165.0      0.0                  executor.submit(Vertex, vertex, 0, list(in_edges), [])
-    67                                                   
-    68         1         27.0     27.0      0.0          server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    69         1          1.0      1.0      0.0          server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    70         1          2.0      2.0      0.0          server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-    71         1          2.0      2.0      0.0          server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    72         1       1652.0   1652.0      0.0          server_socket.bind((host, 10000 + self.worker_id))
-    73         1         20.0     20.0      0.0          server_socket.listen(1500)
-    74                                                   
-    75                                                   # executor = concurrent.futures.ThreadPoolExecutor()
-    76                                                   # self.handle_client(server_socket)
-    77         1        163.0    163.0      0.0          print('worker', self.worker_id , 'ready!')
-    78         2        624.0    312.0      0.0          with concurrent.futures.ThreadPoolExecutor() as e:
-    79        20          5.0      0.2      0.0              while True:
-    80        20  537878110.0    3e+07    100.0                  client_socket, _ = server_socket.accept()
-    81        19      88847.0   4676.2      0.0                  e.submit(self.handle_client_connection, client_socket)
+    45         2         32.0     16.0      0.0          with open(NODE_FEATURES, 'r') as file:
+    46         1         10.0     10.0      0.0              lines = file.readlines()
+    47         1        417.0    417.0      0.0          executor = concurrent.futures.ThreadPoolExecutor(max_workers=1500)
+    48        14          4.0      0.3      0.0          for line in lines:
+    49        13          9.0      0.7      0.0              parts = line.strip().split()[:2]
+    50        13         10.0      0.8      0.0              if int(parts[0]) % NUM_PARTITIONS == self.worker_id:
+    51         3          2.0      0.7      0.0                  self.vertex_number += 1
+    52         3          6.0      2.0      0.0                  out_edges = graph.successors(parts[0])
+    53         3          3.0      1.0      0.0                  in_edges = graph.predecessors(parts[0])
+    54         3        525.0    175.0      0.0                  executor.submit(Vertex, parts[0], int(parts[1]), list(in_edges), list(out_edges))
+    55                                                   
+    56         1         29.0     29.0      0.0          sources = [n for n, d in graph.out_degree() if d == 0]
+    57         8          2.0      0.2      0.0          for vertex in sources:
+    58         7          1.0      0.1      0.0              if int(vertex) % NUM_PARTITIONS == self.worker_id:
+    59         2          2.0      1.0      0.0                  self.vertex_number += 1
+    60         2          1.0      0.5      0.0                  self.initial_vertex.append(vertex)
+    61         2          3.0      1.5      0.0                  in_edges = graph.predecessors(vertex)
+    62         2        348.0    174.0      0.0                  executor.submit(Vertex, vertex, 0, list(in_edges), [])
+    63                                                   
+    64         1         32.0     32.0      0.0          server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    65         1          2.0      2.0      0.0          server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    66         1          4.0      4.0      0.0          server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+    67         1          1.0      1.0      0.0          server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    68         1       1351.0   1351.0      0.0          server_socket.bind((host, 10000 + self.worker_id))
+    69         1         10.0     10.0      0.0          server_socket.listen(1500)
+    70                                                   
+    71         1        193.0    193.0      0.0          print('worker', self.worker_id , 'ready!')
+    72         2        608.0    304.0      0.0          with concurrent.futures.ThreadPoolExecutor() as e:
+    73        14          4.0      0.3      0.0              while True:
+    74        14  103542989.0    7e+06    100.0                  client_socket, _ = server_socket.accept()
+    75        13      31175.0   2398.1      0.0                  e.submit(self.handle_client_connection, client_socket)
 
-Total time: 11.1047 s
+Total time: 13.6297 s
 File: worker_asy.py
-Function: handle_client_connection at line 90
+Function: handle_client_connection at line 84
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-    90                                               @profile
-    91                                               def handle_client_connection(self, client_socket):
-    92        19      30295.0   1594.5      0.3          data = client_socket.recv(102400)
-    93        19         18.0      0.9      0.0          message = data.decode()
-    94        19      31895.0   1678.7      0.3          print('worker', self.worker_id, ':', 'get msg:', data)
-    95        19         17.0      0.9      0.0          if "epoch_" in message:
-    96         1          5.0      5.0      0.0              self.target_epoch = message.split("_")[1]
-    97         4          4.0      1.0      0.0              for e in range(int(self.target_epoch) + 1):
-    98         3       7254.0   2418.0      0.1                  self.send_snapshot_to_initial_vertex(e)
-    99  14274383    4336421.0      0.3     39.1              while True:
-   100  14274383    6619794.0      0.5     59.6                  if len(self.vertexDict.keys()) == self.vertex_number:
-   101         1          2.0      2.0      0.0                      key = f"vertex_{self.worker_id}"
-   102         1        104.0    104.0      0.0                      send_data = json.dumps({key: self.vertexDict})
-   103         1         69.0     69.0      0.0                      client_socket.send(send_data.encode())
-   104         1          0.0      0.0      0.0                      break
-   105                                           
-   106        18          5.0      0.3      0.0          elif "record_" in message:
-   107        18         21.0      1.2      0.0              parts = message.split("_")
-   108        18          4.0      0.2      0.0              nid = parts[1]
-   109        18          6.0      0.3      0.0              feature = parts[2]
-   110        18          3.0      0.2      0.0              epoch = parts[3]
-   111        18         10.0      0.6      0.0              if epoch == self.target_epoch:
-   112         6         13.0      2.2      0.0                  self.vertexDict.update({nid: feature})
-   113        19         14.0      0.7      0.0          if system == 'Darwin':
-   114        19      12944.0    681.3      0.1              client_socket.shutdown(socket.SHUT_WR)
-   115         8      65828.0   8228.5      0.6          client_socket.close()
+    84                                               @profile
+    85                                               def handle_client_connection(self, client_socket):
+    86        13      30477.0   2344.4      0.2          data = client_socket.recv(102400)
+    87        13         15.0      1.2      0.0          message = data.decode()
+    88        13      37099.0   2853.8      0.3          print('worker', self.worker_id, ':', 'get msg:', data)
+    89        13          9.0      0.7      0.0          if "epoch_" in message:
+    90         1          3.0      3.0      0.0              self.target_epoch = message.split("_")[1]
+    91         3          3.0      1.0      0.0              for e in range(1, int(self.target_epoch) + 1):
+    92         2       3186.0   1593.0      0.0                  self.send_snapshot_to_initial_vertex(e)
+    93  16406964    5216545.0      0.3     38.3              while True:
+    94  16406964    8317455.0      0.5     61.0                  if len(self.vertexDict.keys()) == self.vertex_number:
+    95         1          1.0      1.0      0.0                      key = f"vertex_{self.worker_id}"
+    96         1         59.0     59.0      0.0                      send_data = json.dumps({key: self.vertexDict})
+    97         1          9.0      9.0      0.0                      client_socket.send(send_data.encode())
+    98         1          0.0      0.0      0.0                      break
+    99                                           
+   100        12          4.0      0.3      0.0          elif "record_" in message:
+   101        12         11.0      0.9      0.0              parts = message.split("_")
+   102        12          5.0      0.4      0.0              nid = parts[1]
+   103        12          4.0      0.3      0.0              feature = parts[2]
+   104        12          6.0      0.5      0.0              epoch = parts[3]
+   105        12          5.0      0.4      0.0              if epoch == self.target_epoch:
+   106         6         11.0      1.8      0.0                  self.vertexDict.update({nid: feature})
+   107        13         13.0      1.0      0.0          if system == 'Darwin':
+   108        13       6396.0    492.0      0.0              client_socket.shutdown(socket.SHUT_WR)
+   109         3      18428.0   6142.7      0.1          client_socket.close()
 
-Total time: 0.00718 s
+Total time: 0.003141 s
 File: worker_asy.py
-Function: send_snapshot_to_initial_vertex at line 117
+Function: send_snapshot_to_initial_vertex at line 111
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-   117                                               @profile
-   118                                               def send_snapshot_to_initial_vertex(self, epoch):
-   119         3          2.0      0.7      0.0          initial_vertex_notify_list = []
-   120                                                   # print(self.initial_vertex)
-   121         6       4936.0    822.7     68.7          with concurrent.futures.ThreadPoolExecutor() as executor:
-   122         9          6.0      0.7      0.1              for vertex in self.initial_vertex:
-   123         6       2164.0    360.7     30.1                  future = executor.submit(notify, vertex, f"snapshot_{epoch}")
-   124         6          7.0      1.2      0.1                  initial_vertex_notify_list.append(future)
-   125         3         65.0     21.7      0.9          concurrent.futures.wait(initial_vertex_notify_list)
+   111                                               @profile
+   112                                               def send_snapshot_to_initial_vertex(self, epoch):
+   113         2          0.0      0.0      0.0          initial_vertex_notify_list = []
+   114                                                   # print(self.initial_vertex)
+   115         4       2207.0    551.8     70.3          with concurrent.futures.ThreadPoolExecutor() as executor:
+   116         6          3.0      0.5      0.1              for vertex in self.initial_vertex:
+   117         4        888.0    222.0     28.3                  future = executor.submit(notify, vertex, f"snapshot_{epoch}")
+   118         4          2.0      0.5      0.1                  initial_vertex_notify_list.append(future)
+   119         2         41.0     20.5      1.3          concurrent.futures.wait(initial_vertex_notify_list)
 
-Total time: 1190.56 s
+Total time: 67.2047 s
 File: worker_asy.py
-Function: __init__ at line 128
+Function: __init__ at line 122
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-   128                                               @profile
-   129                                               def __init__(self, node, feature, in_edges, out_edges):
-   130         5          3.0      0.6      0.0          self.id = node
-   131         5          5.0      1.0      0.0          self.port = 12345 + int(node)
-   132         5          1.0      0.2      0.0          self.sp = [feature] 
-   133                                                   # self.sp_snapshot = None # sp*
+   122                                               @profile
+   123                                               def __init__(self, node, feature, in_edges, out_edges):
+   124         5          2.0      0.4      0.0          self.id = node
+   125         5          5.0      1.0      0.0          self.port = 12345 + int(node)
+   126         5          0.0      0.0      0.0          self.sp = [feature] 
+   127         5          1.0      0.2      0.0          self.sp_snapshot = None # sp*
+   128                                           
+   129                                                   # in_edges is Op in chandy lamport algorithm.
+   130         5          1.0      0.2      0.0          self.in_edges_list = in_edges
+   131                                                   # out_edges is Ip in chandy lamport algorithm.
+   132         5          0.0      0.0      0.0          self.out_edges_list = out_edges
+   133         5          4.0      0.8      0.0          self.Enabled = self.out_edges_list.copy() # [all out_edges]
    134                                           
-   135                                                   # in_edges is Op in chandy lamport algorithm.
-   136         5          2.0      0.4      0.0          self.in_edges_list = in_edges
-   137                                                   # out_edges is Ip in chandy lamport algorithm.
-   138         5          0.0      0.0      0.0          self.out_edges_list = out_edges
-   139                                                   # self.Enabled = copy.deepcopy(self.out_edges_list) # [all out_edges]
-   140         5          3.0      0.6      0.0          self.Enabled = self.out_edges_list.copy() # [all out_edges]
-   141                                           
-   142                                                   # self.epoch_dict = {}
-   143                                                   # n_f.append(inbox.pop) until '__MARKER__0'
-   144         5          8.0      1.6      0.0          self.neighbor_features = [[] for i in range(K)] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
-   145         5          6.0      1.2      0.0          self.inbox = {out:[] for out in self.out_edges_list} # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
-   146                                                   # self.Mp = [] # [m, m, m, ...] this is part of inbox
-   147         5         83.0     16.6      0.0          self.message_queue = queue.Queue()
-   148                                                   
-   149                                                   # print(self.id)
-   150         5        621.0    124.2      0.0          server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-   151         5         18.0      3.6      0.0          server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-   152         5         26.0      5.2      0.0          server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-   153         5          5.0      1.0      0.0          server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-   154         5      10272.0   2054.4      0.0          server_socket.bind((host, self.port))
-   155         5        425.0     85.0      0.0          server_socket.listen(5000)
-   156                                           
-   157                                                   # print("start: ", self.id)
-   158                                           
-   159         5         62.0     12.4      0.0          exec = concurrent.futures.ThreadPoolExecutor()
-   160                                                   # fList = []
-   161         9          5.0      0.6      0.0          for c in self.out_edges_list:
-   162         4       1407.0    351.8      0.0              exec.submit(self.handle_msg, c, self.inbox[c])
-   163                                                       # fList.append(future)
-   164                                                   # print(self.id)
-   165         5       1490.0    298.0      0.0          exec.submit(self.toInbox)
-   166        44         16.0      0.4      0.0          while True:
-   167        39 1189823362.0    3e+07     99.9              client_socket, _ = server_socket.accept()
-   168        39         11.0      0.3      0.0              try:
-   169        39     453373.0  11624.9      0.0                  data = client_socket.recv(102400)
-   170                                                           # print(time.time())
-   171        39        663.0     17.0      0.0                  self.message_queue.put(data)
-   172                                                           # print('vertex', self.id, ':', 'get msg:', data)
-   173                                                           # self.toInbox(data.decode())
-   174                                                           # client_socket.send(rep.encode())
-   175                                                           # print('vertex', self.id, ':', 'reply msg:', rep)
-   176                                                       finally:
-   177                                                           # if system == 'Darwin':
-   178                                                           #     client_socket.shutdown(socket.SHUT_WR)
-   179        39     271129.0   6952.0      0.0                  client_socket.close()
-   180                                                   # concurrent.futures.wait(fList)
+   135         5         11.0      2.2      0.0          self.neighbor_features = [[] for i in range(K)] # [['v0f23', ...], ['v0v10f13', ...], ['v0v10v20f33', ...], ...] len(n_f)==k (features we use to khop epoch 1)
+   136         5          5.0      1.0      0.0          self.inbox = {out:[] for out in self.out_edges_list} # ['__MARKER__e0v0', ..., 'v0v10v20fxxx', 'v0v10fxxxx', 'v0fxxxxx', '__MARKER__e0v8', ..., '__MARKER__e1v0', ..., ...]
+   137                                                   # self.Mp = [] # [m, m, m, ...] this is part of inbox
+   138         5         76.0     15.2      0.0          self.message_queue = queue.Queue()
+   139                                           
+   140         5         14.0      2.8      0.0          self.khop = threading.Condition()
+   141         5         10.0      2.0      0.0          self.lock = threading.Condition()
+   142         5          0.0      0.0      0.0          self.khop_started = False
+   143                                                   # self.record_state = threading.Condition()
+   144                                                   
+   145         5        829.0    165.8      0.0          server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   146         5         19.0      3.8      0.0          server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+   147         5         27.0      5.4      0.0          server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+   148         5          6.0      1.2      0.0          server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+   149         5       8838.0   1767.6      0.0          server_socket.bind((host, self.port))
+   150         5        699.0    139.8      0.0          server_socket.listen(5000)
+   151                                           
+   152                                                   # print("start: ", self.id)
+   153                                           
+   154         5         61.0     12.2      0.0          exec = concurrent.futures.ThreadPoolExecutor()
+   155                                                   # listen channels
+   156         9          6.0      0.7      0.0          for c in self.out_edges_list:
+   157         4        859.0    214.8      0.0              exec.submit(self.handle_msg, c, self.inbox[c])
+   158                                                   # classify message to specific channel
+   159         5       1338.0    267.6      0.0          exec.submit(self.toInbox)
+   160                                           
+   161        31         29.0      0.9      0.0          while True:
+   162        26   66582408.0    3e+06     99.1              client_socket, _ = server_socket.accept()
+   163        26          9.0      0.3      0.0              try:
+   164        26     481582.0  18522.4      0.7                  data = client_socket.recv(102400)
+   165        26        358.0     13.8      0.0                  self.message_queue.put(data)
+   166                                                           # print('vertex', self.id, ':', 'get msg:', data)
+   167                                                       finally:
+   168                                                           # if system == 'Darwin':
+   169                                                           #     client_socket.shutdown(socket.SHUT_WR)
+   170        26     127483.0   4903.2      0.2                  client_socket.close()
 
-Total time: 1191.44 s
+Total time: 67.9148 s
 File: worker_asy.py
-Function: toInbox at line 182
+Function: toInbox at line 172
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-   182                                               @profile
-   183                                               def toInbox(self):
-   184                                                   # print(message)
-   185        44         19.0      0.4      0.0          while True:
-   186                                                       # print(self.id, self.inbox)
-   187        39 1190341516.0    3e+07     99.9              message = self.message_queue.get().decode()
-   188        39     202549.0   5193.6      0.0              print('vertex', self.id, ':', 'get msg:', message)
-   189        39         35.0      0.9      0.0              if "snapshot_" in message:
-   190         6          7.0      1.2      0.0                  parts = message.split("_")
-   191         6          1.0      0.2      0.0                  epoch = parts[1]
-   192                                                           
-   193         6     187075.0  31179.2      0.0                  self.record(epoch, self.get(self.epoch()))
+   172                                               @profile
+   173                                               def toInbox(self):
+   174                                                   # print(message)
+   175        31         14.0      0.5      0.0          while True:
+   176                                                       # print(self.id, self.inbox)
+   177        26   67182456.0    3e+06     98.9              message = self.message_queue.get().decode()
+   178        26      37619.0   1446.9      0.1              print('vertex', self.id, ':', 'get msg:', message)
+   179        26         17.0      0.7      0.0              if "snapshot_" in message:
+   180         4          3.0      0.8      0.0                  parts = message.split("_")
+   181         4          1.0      0.2      0.0                  epoch = parts[1]
+   182                                                           
+   183         4      88855.0  22213.8      0.1                  self.record(epoch, self.get(self.epoch()))
+   184                                           
+   185                                                           # pass feature and then marker
+   186         4          5.0      1.2      0.0                  initial_vertex_feature_list = []
+   187         8     158248.0  19781.0      0.2                  with concurrent.futures.ThreadPoolExecutor() as executor:
+   188        12          3.0      0.2      0.0                      for out in self.in_edges_list:
+   189         8     194428.0  24303.5      0.3                          future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
+   190         8          4.0      0.5      0.0                          initial_vertex_feature_list.append(future)
+   191         4         59.0     14.8      0.0                  concurrent.futures.wait(initial_vertex_feature_list)
+   192                                           
+   193         4         45.0     11.2      0.0                  print(self.id, "send all features")
    194                                           
-   195                                                           # pass feature and then marker
-   196                                                           # for e in range(epoch):
-   197         6         13.0      2.2      0.0                  initial_vertex_feature_list = []
-   198        12     228782.0  19065.2      0.0                  with concurrent.futures.ThreadPoolExecutor() as executor:
-   199        18         15.0      0.8      0.0                      for out in self.in_edges_list:
-   200        12     112194.0   9349.5      0.0                          future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
-   201        12         13.0      1.1      0.0                          initial_vertex_feature_list.append(future)
-   202         6        100.0     16.7      0.0                  concurrent.futures.wait(initial_vertex_feature_list)
-   203                                           
-   204         6       6381.0   1063.5      0.0                  print(self.id, "send all features")
-   205                                           
-   206         6         15.0      2.5      0.0                  initial_vertex_marker_list = []
-   207        12     224065.0  18672.1      0.0                  with concurrent.futures.ThreadPoolExecutor() as executor:
-   208        18         13.0      0.7      0.0                      for out in self.in_edges_list:
-   209        12     108662.0   9055.2      0.0                          future = executor.submit(notify, out, f"marker_{epoch}_{self.id}")
-   210        12         11.0      0.9      0.0                          initial_vertex_marker_list.append(future)
-   211         6        108.0     18.0      0.0                  concurrent.futures.wait(initial_vertex_marker_list)
-   212                                           
-   213         6      24218.0   4036.3      0.0                  print(self.id, "send all markers")
-   214         6          5.0      0.8      0.0                  continue
-   215                                           
-   216                                                           # return 'ok'
-   217        33         14.0      0.4      0.0              elif "marker_" in message:
-   218        12         26.0      2.2      0.0                  _, _, c = message.split("_")
-   219                                                       else:
-   220        21         41.0      2.0      0.0                  c = message.split('f')[0].split('v')[1]
-   221        33         60.0      1.8      0.0              self.inbox[c].append(message)
-   222                                                       
-   223                                                       # print(self.id, self.message_queue.empty)
-   224                                                       # return 'ok'
+   195         4          4.0      1.0      0.0                  initial_vertex_marker_list = []
+   196         8     118692.0  14836.5      0.2                  with concurrent.futures.ThreadPoolExecutor() as executor:
+   197        12          3.0      0.2      0.0                      for out in self.in_edges_list:
+   198         8     134166.0  16770.8      0.2                          future = executor.submit(notify, out, f"marker_{epoch}_{self.id}")
+   199         8          6.0      0.8      0.0                          initial_vertex_marker_list.append(future)
+   200         4         59.0     14.8      0.0                  concurrent.futures.wait(initial_vertex_marker_list)
+   201                                           
+   202         4         40.0     10.0      0.0                  print(self.id, "send all markers")
+   203         4          1.0      0.2      0.0                  continue
+   204                                           
+   205        22         13.0      0.6      0.0              elif "marker_" in message:
+   206         8         16.0      2.0      0.0                  _, _, c = message.split("_")
+   207                                                       else:
+   208        14         26.0      1.9      0.0                  c = message.split('f')[0].split('v')[1]
+   209        22         36.0      1.6      0.0              self.inbox[c].append(message)
 
-Total time: 0.000543 s
+Total time: 12.0693 s
 File: worker_asy.py
-Function: khop_neighborhood at line 235
+Function: khop_neighborhood at line 220
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-   235                                               @profile
-   236                                               def khop_neighborhood(self):
-   237         9          5.0      0.6      0.9          try:
-   238         9         26.0      2.9      4.8              sums = self.get(self.epoch())
-   239                                                       
-   240         9         14.0      1.6      2.6              node_neighbors_set = set(self.out_edges_list)
-   241                                                       # node_neighbors_set = set(['v' + i for i in out_edges_list])
-   242                                                       
-   243        27         19.0      0.7      3.5              for j in range(K): 
-   244        18        290.0     16.1     53.4                  random_neighbors = random.sample(list(node_neighbors_set), DELTAS[j] if len(node_neighbors_set) > DELTAS[j] else len(node_neighbors_set))
-   245        18          8.0      0.4      1.5                  node_neighbors_set = set()
-   246        18          5.0      0.3      0.9                  temp_set = set()
-   247                                           
-   248                                                           # print(random_neighbors)
-   249                                                           # for feature in self.neighbor_features[j]:
-   250                                                           #         if feature[0:feature.rfind('f')] in random_neighbors:
-   251                                                           #                 sums += int(feature[feature.rfind('f') + 1:])
-   252                                                           
-   253                                                           # if j < k - 1:
-   254                                                           #         for feature in self.neighbor_features[j+1]:
-   255                                                           #                 if feature[0:feature.rfind('v')] in random_neighbors:
-   256                                                           #                         node_neighbors_set.add(feature[0:feature.rfind('f')])
-   257        39         17.0      0.4      3.1                  for vertex in random_neighbors:
-   258        66         17.0      0.3      3.1                      for feature in self.neighbor_features[j]:
-   259        45         47.0      1.0      8.7                          if feature.startswith("v" + vertex):
-   260        21         17.0      0.8      3.1                              start_index = feature.find("f")
-   261        21         13.0      0.6      2.4                              sub_text = feature[start_index + 1:] 
-   262        21         20.0      1.0      3.7                              sums += int(sub_text)
-   263        21          4.0      0.2      0.7                      if j < K - 1:
-   264        30         15.0      0.5      2.8                          for v in self.neighbor_features[j + 1]:
-   265        18          6.0      0.3      1.1                              if v.startswith("v" + vertex):
-   266                                                                           # start_index = len("v" + vertex)
-   267         9          2.0      0.2      0.4                                  end_index = v.find("f")
-   268         9          2.0      0.2      0.4                                  sub_text = v[1:end_index]
-   269         9          4.0      0.4      0.7                                  temp = v[v.rfind("v") + 1 : end_index]
-   270         9          1.0      0.1      0.2                                  if temp not in temp_set:
-   271         9          3.0      0.3      0.6                                      node_neighbors_set.add(sub_text) # [2v8 7v8]
-   272         9          3.0      0.3      0.6                                      temp_set.add(temp)
-   273                                                           
-   274                                                           # featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
+   220                                               @profile
+   221                                               def khop_neighborhood(self):
+   222         6          0.0      0.0      0.0          try:
+   223         6         15.0      2.5      0.0              sums = self.get(self.epoch())
+   224                                                       # print(self.id, sums)
+   225         6          5.0      0.8      0.0              node_neighbors_set = set(self.out_edges_list)
+   226                                           
+   227         6        125.0     20.8      0.0              random_neighbors = random.sample(list(node_neighbors_set), DELTAS[0] if len(node_neighbors_set) > DELTAS[0] else len(node_neighbors_set))
+   228         6          2.0      0.3      0.0              node_neighbors_set = random_neighbors.copy()
+   229         7          2.0      0.3      0.0              while True:
+   230         7         55.0      7.9      0.0                  if all(any(feature.startswith("v" + vertex) for feature in self.neighbor_features[0]) for vertex in random_neighbors): 
+   231         6          0.0      0.0      0.0                      break
+   232                                                           else:
+   233                                                               # print(self.id, vertex, self.neighbor_features[0])
+   234                                                               # with self.record_state:
+   235                                                               #     self.record_state.notify()
+   236         2          4.0      2.0      0.0                      with self.khop:
+   237         1   12068851.0    1e+07    100.0                          self.khop.wait()    
+   238                                                       
+   239        18          7.0      0.4      0.0              for j in range(K): 
+   240        12         70.0      5.8      0.0                  random_neighbors = random.sample(list(node_neighbors_set), DELTAS[j] if len(node_neighbors_set) > DELTAS[j] else len(node_neighbors_set))
+   241        12          3.0      0.2      0.0                  node_neighbors_set = set()
+   242        12          2.0      0.2      0.0                  temp_set = set()
+   243                                           
+   244                                                           # print(random_neighbors)
+   245                                                           # for feature in self.neighbor_features[j]:
+   246                                                           #         if feature[0:feature.rfind('f')] in random_neighbors:
+   247                                                           #                 sums += int(feature[feature.rfind('f') + 1:])
+   248                                                           
+   249                                                           # if j < k - 1:
+   250                                                           #         for feature in self.neighbor_features[j+1]:
+   251                                                           #                 if feature[0:feature.rfind('v')] in random_neighbors:
+   252                                                           #                         node_neighbors_set.add(feature[0:feature.rfind('f')])
+   253        26          6.0      0.2      0.0                  for vertex in random_neighbors:
+   254        44         10.0      0.2      0.0                      for feature in self.neighbor_features[j]:
+   255        30         14.0      0.5      0.0                          if feature.startswith("v" + vertex):
+   256        14          8.0      0.6      0.0                              start_index = feature.find("f")
+   257        14         12.0      0.9      0.0                              sub_text = feature[start_index + 1:] 
+   258        14         14.0      1.0      0.0                              sums += int(sub_text)
+   259                                                                       # print(self.id, vertex, sums)
+   260        14          3.0      0.2      0.0                      if j < K - 1:
+   261        20         13.0      0.7      0.0                          for v in self.neighbor_features[j + 1]:
+   262        12          2.0      0.2      0.0                              if v.startswith("v" + vertex):
+   263         6          1.0      0.2      0.0                                  end_index = v.find("f")
+   264         6          1.0      0.2      0.0                                  sub_text = v[1:end_index]
+   265         6          2.0      0.3      0.0                                  temp = v[v.rfind("v") + 1 : end_index]
+   266         6          1.0      0.2      0.0                                  if temp not in temp_set:
+   267         6          4.0      0.7      0.0                                      node_neighbors_set.add(sub_text) # [2v8 7v8]
+   268         6          2.0      0.3      0.0                                      temp_set.add(temp)
+   269                                                           
+   270                                                           # featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
+   271                                                           
+   272                                                           # while None in featrueList:
+   273                                                           #     sleep(3)
+   274                                                           #     featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
    275                                                           
-   276                                                           # while None in featrueList:
-   277                                                           #     sleep(3)
-   278                                                           #     featrueList = [self.epoch_dict.get(vertex, None) for vertex in random_neighbors]
-   279                                                           
-   280                                                           # for featrue in featrueList:
-   281                                                           #     sums += featrue
-   282                                                           
-   283                                                           # for ask_future in neighborhood_ask_list:
-   284                                                           #     msg = ask_future.result()
-   285                                                           #     data = json.loads(msg)
-   286                                                           #     if j < k - 1:
-   287                                                           #         node_neighbors_set.update(data['out_edges'])
-   288                                                   except Exception as e:
-   289                                                       with open('khop_neighborhood', 'a') as f:
-   290                                                           f.write(str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
-   291         9          5.0      0.6      0.9          return sums
-   292                                               
-   293                                               # def startRecording(self):
-   294                                                   # self.sp_snapshot = self.get(self.epoch())
-   295                                                   # for out in self.out_edges_list:
-   296                                                   #     send marker
-   297                                                   # pass
+   276                                                           # for featrue in featrueList:
+   277                                                           #     sums += featrue
+   278                                                           
+   279                                                           # for ask_future in neighborhood_ask_list:
+   280                                                           #     msg = ask_future.result()
+   281                                                           #     data = json.loads(msg)
+   282                                                           #     if j < k - 1:
+   283                                                           #         node_neighbors_set.update(data['out_edges'])
+   284                                                       
+   285                                                   except Exception as e:
+   286                                                       with open('khop_neighborhood', 'a') as f:
+   287                                                           f.write(str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
+   288                                           
+   289         6         16.0      2.7      0.0          self.neighbor_features = [[] for i in range(K)]
+   290         6          0.0      0.0      0.0          self.sp.append(sums)
+   291                                                   # with self.record_state:
+   292                                                   #     self.record_state.notify()
+   293                                                   # print("khop result: ", self.id, sums)
+   294                                                   # return sums
+   295                                               
+   296                                               # def startRecording(self):
+   297                                                   # self.sp_snapshot = self.get(self.epoch())
+   298                                                   # for out in self.out_edges_list:
+   299                                                   #     send marker
+   300                                                   # pass
 
-Total time: 2139.55 s
+Total time: 406.312 s
 File: worker_asy.py
-Function: handle_msg at line 299
+Function: handle_msg at line 302
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-   299                                               @profile
-   300                                               def handle_msg(self, c, messageList):
-   301   2508193     423935.0      0.2      0.0          while True:
-   302   2508193     301554.0      0.1      0.0              try:
-   303                                                           # print(self.id, messageList)
-   304   2508193     414930.0      0.2      0.0                  message = messageList[0]
-   305       713       1883.0      2.6      0.0              except IndexError:
-   306       709 2129821822.0    3e+06     99.5                  sleep(3)
-   307       709       4107.0      5.8      0.0                  continue
-   308                                                       
-   309   2507480     365609.0      0.1      0.0              if "marker_" in message:
-   310        12         15.0      1.2      0.0                  parts = message.split("_")
-   311        12          7.0      0.6      0.0                  epoch = parts[1]
-   312                                           
-   313        12          5.0      0.4      0.0                  if c in self.Enabled:
-   314        12     544641.0  45386.8      0.0                      self.record(epoch, self.get(self.epoch()))
-   315        12         20.0      1.7      0.0                      self.Enabled.remove(c)
-   316                                           
-   317        12         10.0      0.8      0.0                      if len(self.Enabled) == 0:
-   318                                                                   # send self feature
-   319         9         13.0      1.4      0.0                          vertex_feature_list = []
-   320        18     654957.0  36386.5      0.0                          with concurrent.futures.ThreadPoolExecutor() as executor:
-   321        27         17.0      0.6      0.0                              for out in self.in_edges_list:
-   322        18     113612.0   6311.8      0.0                                  future = executor.submit(notify, out, f"v{self.id}f{self.get(self.epoch())}")
-   323        18         14.0      0.8      0.0                                  vertex_feature_list.append(future)
-   324         9        227.0     25.2      0.0                          concurrent.futures.wait(vertex_feature_list)
-   325                                           
-   326         9      38613.0   4290.3      0.0                          print(self.id, "send all features")
-   327                                           
-   328         9        768.0     85.3      0.0                          self.sp.append(self.khop_neighborhood())
-   329         9         27.0      3.0      0.0                          self.neighbor_features = [[] for i in range(K)]
-   330                                           
-   331         9         23.0      2.6      0.0                          vertex_marker_list = []
-   332        18     444657.0  24703.2      0.0                          with concurrent.futures.ThreadPoolExecutor() as executor:
-   333        27         13.0      0.5      0.0                              for out in self.in_edges_list:
-   334        18     178171.0   9898.4      0.0                                  future = executor.submit(notify, out, f"marker_{epoch}_{self.id}")
-   335        18         33.0      1.8      0.0                                  vertex_marker_list.append(future)
-   336         9        148.0     16.4      0.0                          concurrent.futures.wait(vertex_marker_list)
-   337                                           
-   338         9      24708.0   2745.3      0.0                          print(self.id, "send all markers")
-   339                                           
-   340                                                                   # self.Enabled = copy.deepcopy(self.out_edges_list)
-   341         9         10.0      1.1      0.0                          self.Enabled = self.out_edges_list.copy()
-   342                                                                   # print(self.Enabled)
-   343                                                           # messages are before marker, marker can't be in Disabled
-   344                                                           else:
-   345                                                               continue
-   346                                           
-   347                                                       else:
-   348   2507468     427483.0      0.2      0.0                  if c in self.Enabled:
-   349        21         27.0      1.3      0.0                      index = message.count('v')
-   350        21          7.0      0.3      0.0                      if index <= K:
-   351        21         20.0      1.0      0.0                          self.neighbor_features[index - 1].append(message)
-   352        21          3.0      0.1      0.0                      if index < K:
-   353        12         15.0      1.2      0.0                          send_feature = f"v{self.id}" + message
-   354        12         16.0      1.3      0.0                          neighbor_feature_list = []
-   355        24     494969.0  20623.7      0.0                          with concurrent.futures.ThreadPoolExecutor() as executor:
-   356        33         15.0      0.5      0.0                              for out in self.in_edges_list:
-   357        21     244504.0  11643.0      0.0                                  future = executor.submit(notify, out, send_feature)
-   358        21         35.0      1.7      0.0                                  neighbor_feature_list.append(future)
-   359        12        189.0     15.8      0.0                          concurrent.futures.wait(neighbor_feature_list)
-   360                                           
-   361                                                           else:
-   362   2507447    5048486.0      2.0      0.2                      continue
-   363                                                       
-   364        33         36.0      1.1      0.0              messageList.pop(0)
+   302                                               @profile
+   303                                               def handle_msg(self, c, messageList):
+   304   3706756     638944.0      0.2      0.2          while True:
+   305   3706756     424934.0      0.1      0.1              try:
+   306                                                           # print(self.id, messageList)
+   307   3706756     567757.0      0.2      0.1                  message = messageList[0]
+   308       135        312.0      2.3      0.0              except IndexError:
+   309       131  393544790.0    3e+06     96.9                  sleep(3)
+   310       131        729.0      5.6      0.0                  continue
+   311                                                       
+   312   3706621     511877.0      0.1      0.1              if "marker_" in message:
+   313         8          7.0      0.9      0.0                  parts = message.split("_")
+   314         8          1.0      0.1      0.0                  epoch = parts[1]
+   315                                           
+   316         8          4.0      0.5      0.0                  if c in self.Enabled:
+   317        16      48718.0   3044.9      0.0                      with self.lock:
+   318                                                                   # first time receive marker from one edge
+   319         8          2.0      0.2      0.0                          if not self.khop_started:
+   320         6         14.0      2.3      0.0                              self.sp_snapshot = self.get(self.epoch())
+   321         6      56566.0   9427.7      0.0                              threading.Thread(target=self.khop_neighborhood).start()
+   322         6          5.0      0.8      0.0                              self.khop_started = True
+   323                                                                   # receive markers from other edges
+   324                                                                   else:
+   325         4          6.0      1.5      0.0                              with self.khop:
+   326         2          8.0      4.0      0.0                                  self.khop.notify()
+   327                                                                   #  wait for khop finish
+   328         8          7.0      0.9      0.0                          if len(self.Enabled) == 1: 
+   329         7         19.0      2.7      0.0                              while self.epoch() != int(epoch):
+   330         1         14.0     14.0      0.0                                  print("here")
+   331         1    1005155.0    1e+06      0.2                                  sleep(1)
+   332         6          2.0      0.3      0.0                              self.khop_started = False
+   333                                                                   # if len(self.Enabled) == 1 and t.is_alive():
+   334                                                                   #     print("here1")
+   335                                                                   #     t.join()
+   336                                                                           
+   337                                                                   # with self.record_state:
+   338                                                                   #     self.record_state.wait()
+   339         8     408374.0  51046.8      0.1                          self.record(self.epoch(), self.get(self.epoch()))
+   340                                           
+   341         8          9.0      1.1      0.0                          self.Enabled.remove(c)
+   342                                           
+   343         8          5.0      0.6      0.0                      if len(self.Enabled) == 0:
+   344                                                                   # send self feature
+   345         6          7.0      1.2      0.0                          vertex_feature_list = []
+   346        12     294077.0  24506.4      0.1                          with concurrent.futures.ThreadPoolExecutor() as executor:
+   347        18          9.0      0.5      0.0                              for out in self.in_edges_list:
+   348        12     116871.0   9739.2      0.0                                  future = executor.submit(notify, out, f"v{self.id}f{self.sp_snapshot}")
+   349        12         11.0      0.9      0.0                                  vertex_feature_list.append(future)
+   350         6        105.0     17.5      0.0                          concurrent.futures.wait(vertex_feature_list)
+   351                                           
+   352         6      30375.0   5062.5      0.0                          print(self.id, "send all features")
+   353                                           
+   354                                                                   # self.sp.append(self.khop_neighborhood())
+   355                                                                   # self.neighbor_features = [[] for i in range(K)]
+   356                                                                   # self.record(epoch, self.get(self.epoch()))
+   357                                           
+   358                                                                   # send self marker
+   359         6         12.0      2.0      0.0                          vertex_marker_list = []
+   360        12     182565.0  15213.8      0.0                          with concurrent.futures.ThreadPoolExecutor() as executor:
+   361        18          9.0      0.5      0.0                              for out in self.in_edges_list:
+   362        12     163084.0  13590.3      0.0                                  future = executor.submit(notify, out, f"marker_{epoch}_{self.id}")
+   363        12         13.0      1.1      0.0                                  vertex_marker_list.append(future)
+   364         6         92.0     15.3      0.0                          concurrent.futures.wait(vertex_marker_list)
    365                                           
-   366                                                       # return 'ok'
+   366         6       6226.0   1037.7      0.0                          print(self.id, "send all markers")
    367                                           
-   368                                                           # if cqp not in self.Recorded:
-   369                                                           #     pass
-   370                                                           
-   371                                                           # elif cqp in self.Recorded:
-   372                                                           #     pass
+   368         6          7.0      1.2      0.0                          self.Enabled = self.out_edges_list.copy()
+   369                                                           # messages are before marker, marker can't be in Disabled
+   370                                                           else:
+   371                                                               continue
+   372                                           
+   373                                                       else:
+   374   3706613     611643.0      0.2      0.2                  if c in self.Enabled:
+   375        14         14.0      1.0      0.0                      index = message.count('v')
+   376        14          1.0      0.1      0.0                      if index <= K:
+   377        14         11.0      0.8      0.0                          self.neighbor_features[index - 1].append(message)
+   378        14          6.0      0.4      0.0                      if index < K:
+   379         8         10.0      1.2      0.0                          send_feature = f"v{self.id}" + message
+   380         8          7.0      0.9      0.0                          neighbor_feature_list = []
+   381        16     410316.0  25644.8      0.1                          with concurrent.futures.ThreadPoolExecutor() as executor:
+   382        22          8.0      0.4      0.0                              for out in self.in_edges_list:
+   383        14     202601.0  14471.5      0.0                                  future = executor.submit(notify, out, send_feature)
+   384        14          5.0      0.4      0.0                                  neighbor_feature_list.append(future)
+   385         8        119.0     14.9      0.0                          concurrent.futures.wait(neighbor_feature_list)
+   386                                           
+   387                                                           else:
+   388   3706599    7085123.0      1.9      1.7                      continue
+   389                                                       
+   390        22         22.0      1.0      0.0              messageList.pop(0)
+   391                                           
+   392                                                           # if cqp not in self.Recorded:
+   393                                                           #     pass
+   394                                                           
+   395                                                           # elif cqp in self.Recorded:
+   396                                                           #     pass
 
-Total time: 0.731566 s
+Total time: 0.497133 s
 File: worker_asy.py
-Function: record at line 373
+Function: record at line 397
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-   373                                               @profile
-   374                                               def record(self, epoch, sp_snaposhot):
-   375        18         25.0      1.4      0.0          message = f"record_{self.id}_{sp_snaposhot}_{epoch}"
-   376        18     731541.0  40641.2    100.0          notify(str(int(self.id) % NUM_PARTITIONS), message, True)
+   397                                               @profile
+   398                                               def record(self, epoch, sp_snaposhot):
+   399        12         19.0      1.6      0.0          message = f"record_{self.id}_{sp_snaposhot}_{epoch}"
+   400        12     497114.0  41426.2    100.0          notify(str(int(self.id) % NUM_PARTITIONS), message, True)
 
-Total time: 4.51437 s
+Total time: 3.06051 s
 File: worker_asy.py
-Function: notify at line 378
+Function: notify at line 402
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-   378                                           @profile
-   379                                           def notify(node, msg, worker=False):
-   380       105     793521.0   7557.3     17.6      print('notify:', msg)
-   381       105         31.0      0.3      0.0      while True:
-   382       105     697157.0   6639.6     15.4          client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-   383       105        646.0      6.2      0.0          client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-   384       105        828.0      7.9      0.0          client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-   385       105        228.0      2.2      0.0          client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-   386       105         22.0      0.2      0.0          try:
-   387       105         27.0      0.3      0.0              if worker:
-   388        18     250296.0  13905.3      5.5                  client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 10000 + int(node)))
-   389                                                       else:
-   390        87    1343550.0  15443.1     29.8                  client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 12345 + int(node)))
-   391                                                       
-   392                                                       # print("connect: ", node)
-   393                                                       # print(time.time())
-   394       105     514815.0   4903.0     11.4              client_socket.send(msg.encode())
-   395                                                       
-   396                                                       # data = client_socket.recv(102400).decode()
-   397                                                       
-   398                                                       # print('get reply:', data)
-   399                                           
-   400       105     359447.0   3423.3      8.0              client_socket.shutdown(socket.SHUT_WR)
-   401       105     553460.0   5271.0     12.3              client_socket.close()
-   402       105         45.0      0.4      0.0              break
-   403                                                   except ConnectionRefusedError:
-   404                                                       # print('notify connection error')
-   405                                                       client_socket.close()
-   406                                                       # sleep(1)
-   407                                                       continue
-   408                                                   except OSError:
-   409                                                       print('notify os error')
-   410                                                       client_socket.close()
-   411                                                       # sleep(1)
-   412                                                       continue
-   413                                                   # except Exception as e:
-   414                                                   #     with open('ask', 'a') as f:
-   415                                                   #         f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
-   416                                                   finally:
-   417       105        294.0      2.8      0.0              client_socket.close()
+   402                                           @profile
+   403                                           def notify(node, msg, worker=False):
+   404        70     247163.0   3530.9      8.1      print('notify:', msg)
+   405        70         19.0      0.3      0.0      while True:
+   406        70     460265.0   6575.2     15.0          client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   407        70        323.0      4.6      0.0          client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+   408        70        434.0      6.2      0.0          client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+   409        70        121.0      1.7      0.0          client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+   410        70         12.0      0.2      0.0          try:
+   411        70         21.0      0.3      0.0              if worker:
+   412        12     181294.0  15107.8      5.9                  client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 10000 + int(node)))
+   413                                                       else:
+   414        58    1046691.0  18046.4     34.2                  client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 12345 + int(node)))
+   415                                                       
+   416                                                       # print("connect: ", node)
+   417        70     334056.0   4772.2     10.9              client_socket.send(msg.encode())
+   418                                                       
+   419                                                       # data = client_socket.recv(102400).decode()
+   420                                                       # print('get reply:', data)
+   421                                           
+   422        70     342336.0   4890.5     11.2              client_socket.shutdown(socket.SHUT_WR)
+   423        70     447550.0   6393.6     14.6              client_socket.close()
+   424        70         29.0      0.4      0.0              break
+   425                                                   except ConnectionRefusedError:
+   426                                                       print('notify connection error')
+   427                                                       client_socket.close()
+   428                                                       # sleep(1)
+   429                                                       continue
+   430                                                   except OSError:
+   431                                                       print('notify os error')
+   432                                                       client_socket.close()
+   433                                                       # sleep(1)
+   434                                                       continue
+   435                                                   # except Exception as e:
+   436                                                   #     with open('ask', 'a') as f:
+   437                                                   #         f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
+   438                                                   finally:
+   439        70        199.0      2.8      0.0              client_socket.close()
 

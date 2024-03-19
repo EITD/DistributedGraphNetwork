@@ -1,10 +1,12 @@
+from datetime import datetime
 import queue
 import random
 import socket
 import struct
 import threading
-from time import sleep
+import time
 import traceback
+import psutil
 from ConvertFile import ConvertFile
 import json
 import sys
@@ -306,7 +308,7 @@ class Vertex:
                 # print(self.id, messageList)
                 message = messageList[0]
             except IndexError:
-                sleep(3)
+                time.sleep(3)
                 continue
             
             if "marker_" in message:
@@ -327,8 +329,7 @@ class Vertex:
                         #  wait for khop finish
                         if len(self.Enabled) == 1: 
                             while self.epoch() != int(epoch):
-                                print("here")
-                                sleep(1)
+                                time.sleep(1)
                             self.khop_started = False
                         # if len(self.Enabled) == 1 and t.is_alive():
                         #     print("here1")
@@ -438,5 +439,14 @@ def notify(node, msg, worker=False):
         finally:
             client_socket.close()
 
+def memory():
+    while True:
+        memory_info = psutil.virtual_memory()
+        current_time = datetime.now().time()
+        with open('memory_marker', 'a') as f: 
+            f.write('\n' + f"{current_time} {memory_info.percent}")
+        time.sleep(1)
+
 if __name__ == "__main__":
+    # threading.Thread(target=memory).start()
     worker = Worker(sys.argv[1])

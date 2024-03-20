@@ -322,6 +322,7 @@ class Vertex:
                         #  wait for khop finish
                         if len(self.Enabled) == 1: 
                             while self.epoch() != int(epoch):
+                                print('khop here')
                                 sleep(1)
                             self.khop_started = False
                         # if len(self.Enabled) == 1 and t.is_alive():
@@ -402,6 +403,12 @@ def notify(node, msg, worker=False):
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         try:
+            r = random.randint(0,2)
+            if r == 1:
+                raise ConnectionRefusedError()
+            elif r == 2:
+                raise OSError()
+            
             if worker:
                 client_socket.connect((serverDict[int(node) % NUM_PARTITIONS], 10000 + int(node)))
             else:

@@ -132,13 +132,13 @@ def train_asynchronize_marker(epochs):
 # response = train_asynchronize(1, 1, 5000)
 # response = train_asynchronize(1, 2, [5000, 5000**2])
 # response = train_asynchronize(2, 1, 5000)
-response = train_asynchronize(2, 2, [5000, 5000**2])
+# response = train_asynchronize(2, 2, [5000, 5000**2])
 # response = train_asynchronize(2, 2, [20, 400])
 
 
 # response = train_asynchronize_marker(1)
 # response = train_asynchronize_marker(2)
-# response = train_asynchronize_marker(3)
+response = train_asynchronize_marker(3)
 
 
 # response = train_synchronize(1, 2, [20, 400])

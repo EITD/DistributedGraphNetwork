@@ -373,7 +373,7 @@ def notify(node, msg, worker=False):
         try:
             r = random.randint(0,2)
             if r == 1:
-                raise ConnectionError()
+                raise ConnectionRefusedError()
             elif r == 2:
                 raise OSError()
             
@@ -393,7 +393,7 @@ def notify(node, msg, worker=False):
             client_socket.close()
             break
         except ConnectionRefusedError:
-            # print('notify connection error')
+            print('notify connection error')
             client_socket.close()
             # sleep(1)
             continue

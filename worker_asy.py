@@ -420,7 +420,10 @@ def notify(node, msg, worker=False):
             # data = client_socket.recv(102400).decode()
             # print('get reply:', data)
 
-            client_socket.shutdown(socket.SHUT_WR)
+            if system == 'Darwin':
+                client_socket.shutdown(socket.SHUT_WR)
+            else:
+                client_socket.shutdown(socket.SHUT_RDWR)
             client_socket.close()
             break
         except ConnectionRefusedError:

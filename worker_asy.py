@@ -434,6 +434,7 @@ def notify(node, msg, worker=False):
         except OSError:
             print('notify os error')
             client_socket.close()
+            break
             # sleep(1)
             # continue
         # except Exception as e:

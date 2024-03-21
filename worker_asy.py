@@ -21,9 +21,9 @@ except NameError:
 system = platform.system()
 
 NUM_PARTITIONS = 4
-K = 2
-# DELTAS = [20, 400, 160000]
-DELTAS = [5000, 5000**2]
+K = 3
+DELTAS = [20, 400, 160000]
+# DELTAS = [5000, 5000**2]
 NODE_FEATURES = "./data_small/node_feature_small.txt"
 # NODE_FEATURES = "./data/node_features.txt"
 host = 'localhost'
@@ -322,7 +322,7 @@ class Vertex:
                         #  wait for khop finish
                         if len(self.Enabled) == 1: 
                             while self.epoch() != int(epoch):
-                                print('khop here')
+                                print('khop here:', self.id, self.sp, epoch)
                                 sleep(1)
                             self.khop_started = False
                         # if len(self.Enabled) == 1 and t.is_alive():
@@ -432,7 +432,7 @@ def notify(node, msg, worker=False):
             print('notify os error')
             client_socket.close()
             # sleep(1)
-            continue
+            # continue
         # except Exception as e:
         #     with open('ask', 'a') as f:
         #         f.write(str(msg) + '\n' + str(e) + '\n' + str(traceback.format_exc()) + '\n\n\n\n\n')
